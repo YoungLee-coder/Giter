@@ -23,6 +23,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       should_release: ${{ steps.version.outputs.should_release }}
+      release_body: ${{ steps.notes.outputs.release_body }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -55,6 +56,43 @@ jobs:
           else
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Build release notes from CHANGELOG.md
+        id: notes
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [ ! -f CHANGELOG.md ]; then
+            echo "CHANGELOG.md is missing. Add release notes before publishing." >&2
+            exit 1
+          fi
+
+          NOTES=$(awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" {found=1; next}
+            found && /^## \[/ {exit}
+            found {print}
+          ' CHANGELOG.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')
+
+          if [ -z "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then
+            echo "No CHANGELOG.md section found for [$VERSION]. Add ## [$VERSION] notes before releasing." >&2
+            exit 1
+          fi
+
+          {
+            echo 'release_body<<EOF'
+            echo "## What's Changed"
+            echo
+            printf '%s\n' "$NOTES"
+            echo
+            echo "## Downloads"
+            echo
+            echo "- **macOS Apple Silicon**: \`.dmg\` (aarch64)"
+            echo "- **macOS Intel**: \`.dmg\` (x86_64)"
+            echo "- **Windows**: NSIS installer (\`.exe\`) and MSI (\`.msi\`)"
+            echo
+            echo "Unsigned builds: on macOS, right-click the app and choose Open the first time."
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
 
   publish-tauri:
     needs: check-version
@@ -98,17 +136,12 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: Giter v__VERSION__
-          releaseBody: |
-            ## Downloads
-
-            - **macOS Apple Silicon**: `.dmg` (aarch64)
-            - **macOS Intel**: `.dmg` (x86_64)
-            - **Windows**: NSIS installer (`.exe`) and MSI (`.msi`)
-
-            Unsigned builds: on macOS, right-click the app and choose Open the first time.
+          releaseBody: ${{ needs.check-version.outputs.release_body }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

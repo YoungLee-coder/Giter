@@ -20,7 +20,11 @@ Grab a build from [Releases](../../releases/latest):
 | macOS Intel | `.dmg` (x86_64) |
 | Windows | NSIS (`.exe`) or MSI |
 
-Builds are unsigned. On macOS, right-click the app and choose **Open** the first time.
+Builds are unsigned. On modern macOS the app may show as “damaged” after download because of the quarantine flag. Clear it once, then open normally:
+
+```bash
+xattr -cr /Applications/Giter.app
+```
 
 ### What it does
 
@@ -30,6 +34,7 @@ Builds are unsigned. On macOS, right-click the app and choose **Open** the first
 - Parallel jobs (default 4, configurable 1-16) with per-repo progress
 - Repo detail: remotes, recent commits, working-tree changes, reveal in Finder/Explorer
 - EN / 中文 UI; light, dark, or system theme
+- In-app updates: Settings → About → **Check for updates**, or a startup banner when a newer release is available
 
 Scan depth defaults to 3 (1-10). It skips `node_modules`, `target`, `dist`, `build`, and hidden directories, and does not walk into nested repos.
 
@@ -60,7 +65,9 @@ npm run tauri dev
 npm run tauri build
 ```
 
-Artifacts: macOS `.dmg`; Windows NSIS / MSI. CI publishes the same when the version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` bumps on `main`.
+Artifacts: macOS `.dmg`; Windows NSIS / MSI. CI publishes the same when the version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` bumps on `main`. Releases also upload signed updater bundles and `latest.json` for in-app updates.
+
+Release CI needs repository secrets `TAURI_SIGNING_PRIVATE_KEY` (required) and optional `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 
 ### Stack
 
@@ -86,7 +93,11 @@ macOS / Windows 上管理本地 Git 仓库的桌面应用。添加或扫描仓�
 | macOS Intel | `.dmg`（x86_64） |
 | Windows | NSIS（`.exe`）或 MSI |
 
-构建未签名。macOS 上第一次打开请右键选 **打开**。
+构建未签名。较新的 macOS 下载后可能提示「已损坏」，是隔离属性导致的。先清除一次，再正常打开：
+
+```bash
+xattr -cr /Applications/Giter.app
+```
 
 ### 能做什么
 
@@ -96,6 +107,7 @@ macOS / Windows 上管理本地 Git 仓库的桌面应用。添加或扫描仓�
 - 并行任务（默认 4，可调 1-16），每个仓库单独显示进度
 - 仓库详情：远程、最近提交、工作区改动，可在 Finder / 资源管理器中显示
 - 界面 EN / 中文；浅色、深色或跟随系统
+- 应用内更新：设置 → 关于 → **检查更新**；启动时若有新版本会显示可关闭提示条
 
 扫描深度默认 3（1-10）。会跳过 `node_modules`、`target`、`dist`、`build` 和隐藏目录，也不会钻进嵌套仓库。
 
@@ -126,7 +138,9 @@ npm run tauri dev
 npm run tauri build
 ```
 
-产物：macOS `.dmg`；Windows NSIS / MSI。当 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` 三者版本一致并在 `main` 上递增时，CI 会发布同样的包。
+产物：macOS `.dmg`；Windows NSIS / MSI。当 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` 三者版本一致并在 `main` 上递增时，CI 会发布同样的包。发布还会上传签名的更新包与 `latest.json`，供应用内更新使用。
+
+发布 CI 需要仓库 Secret：`TAURI_SIGNING_PRIVATE_KEY`（必填），以及可选的 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。
 
 ### 技术栈
 

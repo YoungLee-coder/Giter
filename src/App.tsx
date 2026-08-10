@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import type { Update } from "@tauri-apps/plugin-updater";
 import { open } from "@tauri-apps/plugin-dialog";
 import { BatchBar, RepoGrid } from "./components/RepoUI";
 import { RepoDetailModal } from "./components/RepoDetailModal";
@@ -11,6 +12,16 @@ import {
   type RemovedRepo,
   type RepoStatus,
 } from "./lib/tauri";
+import {
+  checkForAppUpdate,
+  dismissUpdateVersion,
+  downloadAndInstallUpdate,
+  formatUpdateError,
+  getDismissedUpdateVersion,
+  markUpdateChecked,
+  relaunchApp,
+  shouldAutoCheckForUpdate,
+} from "./lib/updater";
 import { useSettings } from "./settings";
 import "./App.css";
 
@@ -29,6 +40,9 @@ function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailRepo, setDetailRepo] = useState<RepoStatus | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
+  const [updateInstalling, setUpdateInstalling] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
   const [isMac] = useState(() => {
     return (
       /Mac|iPhone|iPod|iPad/i.test(navigator.platform) ||
@@ -131,6 +145,27 @@ function App() {
   }, [load]);
 
   useEffect(() => {
+    if (!shouldAutoCheckForUpdate()) return;
+
+    let cancelled = false;
+    (async () => {
+      markUpdateChecked();
+      try {
+        const update = await checkForAppUpdate();
+        if (cancelled || !update) return;
+        if (getDismissedUpdateVersion() === update.version) return;
+        setAvailableUpdate(update);
+      } catch {
+        /* startup check is best-effort */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     let unlisten: (() => void) | undefined;
     listen<BatchProgress>("batch-progress", (event) => {
       const p = event.payload;
@@ -142,6 +177,31 @@ function App() {
       unlisten?.();
     };
   }, []);
+
+  const installAvailableUpdate = async () => {
+    if (!availableUpdate || updateInstalling) return;
+    setUpdateInstalling(true);
+    setUpdateProgress(0);
+    setError(null);
+    try {
+      await downloadAndInstallUpdate(
+        availableUpdate,
+        ({ downloaded, contentLength }) => {
+          const percent =
+            contentLength && contentLength > 0
+              ? Math.min(100, Math.round((downloaded / contentLength) * 100))
+              : 0;
+          setUpdateProgress(percent);
+        },
+      );
+      setUpdateProgress(null);
+      await relaunchApp();
+    } catch (e) {
+      setUpdateInstalling(false);
+      setUpdateProgress(null);
+      setError(t("updateFailed", { error: formatUpdateError(e) }));
+    }
+  };
 
   const toggle = (path: string) => {
     setSelected((prev) => {
@@ -314,12 +374,48 @@ function App() {
         </div>
       </header>
 
-      {(error || notice || gitOk === false) && (
+      {(error || notice || gitOk === false || availableUpdate) && (
         <div className="banners">
           {error && <div className="banner err">{error}</div>}
           {notice && <div className="banner info">{notice}</div>}
           {gitOk === false && (
             <div className="banner warn">{t("gitMissingBanner")}</div>
+          )}
+          {availableUpdate && (
+            <div className="banner info banner--update">
+              <span>
+                {updateInstalling
+                  ? updateProgress == null
+                    ? t("installingUpdate")
+                    : t("downloadingUpdate", { percent: updateProgress })
+                  : t("updateAvailableBanner", {
+                      version: availableUpdate.version,
+                    })}
+              </span>
+              <span className="banner__actions">
+                {!updateInstalling && (
+                  <>
+                    <button
+                      type="button"
+                      className="banner__btn"
+                      onClick={() => void installAvailableUpdate()}
+                    >
+                      {t("downloadAndInstall")}
+                    </button>
+                    <button
+                      type="button"
+                      className="banner__btn banner__btn--muted"
+                      onClick={() => {
+                        dismissUpdateVersion(availableUpdate.version);
+                        setAvailableUpdate(null);
+                      }}
+                    >
+                      {t("updateLater")}
+                    </button>
+                  </>
+                )}
+              </span>
+            </div>
           )}
         </div>
       )}

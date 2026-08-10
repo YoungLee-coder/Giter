@@ -1,4 +1,6 @@
-use crate::git::{self, BatchProgress, GithubPublishInfo, RefreshResult, RemovedRepo, RepoDetail, RepoStatus};
+use crate::git::{
+    self, BatchProgress, GithubPublishInfo, RefreshResult, RemovedRepo, RepoDetail, RepoStatus,
+};
 use crate::scan;
 use crate::settings::{self, AppInfo, AppSettings};
 use crate::store::{self, RepoEntry};
@@ -27,11 +29,7 @@ pub fn check_git() -> bool {
 #[tauri::command]
 pub fn list_repos(app: AppHandle) -> Result<Vec<RepoStatus>, String> {
     let store = store::load(&app)?;
-    Ok(store
-        .repos
-        .iter()
-        .map(|r| git::status(&r.path))
-        .collect())
+    Ok(store.repos.iter().map(|r| git::status(&r.path)).collect())
 }
 
 #[tauri::command]
@@ -151,10 +149,7 @@ struct RefreshPrep {
 
 fn prepare_refresh(app: AppHandle, paths: Option<Vec<String>>) -> Result<RefreshPrep, String> {
     let mut store = store::load(&app)?;
-    let partial = paths
-        .as_ref()
-        .map(|p| !p.is_empty())
-        .unwrap_or(false);
+    let partial = paths.as_ref().map(|p| !p.is_empty()).unwrap_or(false);
     let targets: Vec<String> = if partial {
         paths.unwrap()
     } else {
@@ -188,7 +183,11 @@ fn prepare_refresh(app: AppHandle, paths: Option<Vec<String>>) -> Result<Refresh
 }
 
 #[tauri::command]
-pub fn scan_folder(app: AppHandle, path: String, max_depth: Option<u32>) -> Result<Vec<RepoStatus>, String> {
+pub fn scan_folder(
+    app: AppHandle,
+    path: String,
+    max_depth: Option<u32>,
+) -> Result<Vec<RepoStatus>, String> {
     let depth = match max_depth {
         Some(d) => d,
         None => settings::load(&app)?.scan_depth,
@@ -233,10 +232,7 @@ pub async fn batch_fetch(
     state: State<'_, AppState>,
     paths: Vec<String>,
 ) -> Result<Vec<BatchProgress>, String> {
-    with_batch_lock(&state, async {
-        run_batch(app, paths, false).await
-    })
-    .await
+    with_batch_lock(&state, async { run_batch(app, paths, false).await }).await
 }
 
 #[tauri::command]
@@ -245,10 +241,7 @@ pub async fn batch_update(
     state: State<'_, AppState>,
     paths: Vec<String>,
 ) -> Result<Vec<BatchProgress>, String> {
-    with_batch_lock(&state, async {
-        run_batch(app, paths, true).await
-    })
-    .await
+    with_batch_lock(&state, async { run_batch(app, paths, true).await }).await
 }
 
 async fn run_batch(

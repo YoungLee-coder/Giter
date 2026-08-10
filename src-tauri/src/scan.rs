@@ -19,8 +19,8 @@ pub fn scan_folder(root: &str, max_depth: u32) -> Result<Vec<String>, String> {
 fn walk(dir: &Path, depth: u32, max_depth: u32, out: &mut Vec<String>) -> Result<(), String> {
     // Only treat as a repo when `.git` is structurally valid (rejects empty/stub dirs).
     if store::is_git_repo_at(dir) {
-        let canonical = fs::canonicalize(dir)
-            .map_err(|e| format!("canonicalize {}: {e}", dir.display()))?;
+        let canonical =
+            fs::canonicalize(dir).map_err(|e| format!("canonicalize {}: {e}", dir.display()))?;
         out.push(canonical.to_string_lossy().to_string());
         // Do not descend into nested repos
         return Ok(());

@@ -945,6 +945,29 @@ button.detail-publish__choice:disabled {
   color: var(--ink-secondary);
 }
 
+.settings-about__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.settings-about__actions .ghost {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.settings-about__status {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink-secondary);
+}
+
+.settings-about__status--err {
+  color: var(--err);
+}
+
 .settings-about__sep {
   color: var(--ink-tertiary);
 }
@@ -1076,6 +1099,40 @@ button.settings-row--nav:focus-visible {
 .banner.info {
   background: var(--bg-badge-run);
   color: var(--run);
+}
+
+.banner--update {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.banner__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.banner__btn {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.banner__btn:hover {
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+
+.banner__btn--muted {
+  border-color: transparent;
+  background: transparent;
 }
 
 .content {

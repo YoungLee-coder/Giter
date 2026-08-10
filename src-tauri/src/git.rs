@@ -331,8 +331,7 @@ pub fn publish_to_github(path: &str, name: &str, private: bool) -> Result<RepoDe
     }
     if !gh_available() {
         return Err(
-            "GitHub CLI (gh) was not found in PATH. Install it from https://cli.github.com/"
-                .into(),
+            "GitHub CLI (gh) was not found in PATH. Install it from https://cli.github.com/".into(),
         );
     }
 
@@ -353,14 +352,7 @@ pub fn publish_to_github(path: &str, name: &str, private: bool) -> Result<RepoDe
     let has_commits = run_git(path, &["rev-parse", "--verify", "HEAD"]).is_ok();
 
     let mut args = vec![
-        "repo",
-        "create",
-        name,
-        visibility,
-        "--source",
-        ".",
-        "--remote",
-        "origin",
+        "repo", "create", name, visibility, "--source", ".", "--remote", "origin",
     ];
     if has_commits {
         args.push("--push");

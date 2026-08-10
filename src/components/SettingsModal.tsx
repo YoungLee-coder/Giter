@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import type { Update } from "@tauri-apps/plugin-updater";
 import { useI18n } from "../i18n";
 import {
   api,
@@ -6,6 +7,14 @@ import {
   type GitInfo,
   type ThemePreference,
 } from "../lib/tauri";
+import {
+  checkForAppUpdate,
+  clearDismissedUpdateVersion,
+  downloadAndInstallUpdate,
+  formatUpdateError,
+  markUpdateChecked,
+  relaunchApp,
+} from "../lib/updater";
 import { useSettings } from "../settings";
 import { LanguageSwitch } from "./LanguageSwitch";
 
@@ -15,6 +24,15 @@ type Props = {
 };
 
 type SettingsPane = "main" | "git";
+
+type UpdateUiState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "upToDate" }
+  | { kind: "available"; update: Update }
+  | { kind: "downloading"; update: Update; percent: number }
+  | { kind: "installing"; update: Update }
+  | { kind: "error"; message: string };
 
 const THEME_OPTIONS: {
   value: ThemePreference;
@@ -37,13 +55,19 @@ export function SettingsModal({ open, onClose }: Props) {
   const [concurrencyDraft, setConcurrencyDraft] = useState(
     String(settings.concurrency),
   );
+  const [updateState, setUpdateState] = useState<UpdateUiState>({ kind: "idle" });
   const scanDepthId = useId();
   const concurrencyId = useId();
+  const updateBusy =
+    updateState.kind === "checking" ||
+    updateState.kind === "downloading" ||
+    updateState.kind === "installing";
 
   useEffect(() => {
     if (!open) {
       setPane("main");
       setGitInfo(null);
+      setUpdateState({ kind: "idle" });
       return;
     }
     setScanDepthDraft(String(settings.scanDepth));
@@ -132,6 +156,39 @@ export function SettingsModal({ open, onClose }: Props) {
     else setConcurrencyDraft(String(value));
     if (settings[field] !== value) {
       void updateSettings({ [field]: value });
+    }
+  };
+
+  const onCheckForUpdates = async () => {
+    setUpdateState({ kind: "checking" });
+    markUpdateChecked();
+    try {
+      const update = await checkForAppUpdate();
+      if (!update) {
+        setUpdateState({ kind: "upToDate" });
+        return;
+      }
+      clearDismissedUpdateVersion();
+      setUpdateState({ kind: "available", update });
+    } catch (error) {
+      setUpdateState({ kind: "error", message: formatUpdateError(error) });
+    }
+  };
+
+  const onInstallUpdate = async (update: Update) => {
+    setUpdateState({ kind: "downloading", update, percent: 0 });
+    try {
+      await downloadAndInstallUpdate(update, ({ downloaded, contentLength }) => {
+        const percent =
+          contentLength && contentLength > 0
+            ? Math.min(100, Math.round((downloaded / contentLength) * 100))
+            : 0;
+        setUpdateState({ kind: "downloading", update, percent });
+      });
+      setUpdateState({ kind: "installing", update });
+      await relaunchApp();
+    } catch (error) {
+      setUpdateState({ kind: "error", message: formatUpdateError(error) });
     }
   };
 
@@ -319,6 +376,50 @@ export function SettingsModal({ open, onClose }: Props) {
                     })}
                   </span>
                 </div>
+                <div className="settings-about__actions">
+                  {updateState.kind === "available" ? (
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => void onInstallUpdate(updateState.update)}
+                    >
+                      {t("downloadAndInstall")}
+                    </button>
+                  ) : updateState.kind === "downloading" ||
+                    updateState.kind === "installing" ? (
+                    <button type="button" className="ghost" disabled>
+                      {updateState.kind === "downloading"
+                        ? t("downloadingUpdate", {
+                            percent: updateState.percent,
+                          })
+                        : t("installingUpdate")}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={updateBusy}
+                      onClick={() => void onCheckForUpdates()}
+                    >
+                      {updateState.kind === "checking"
+                        ? t("checkingForUpdates")
+                        : t("checkForUpdates")}
+                    </button>
+                  )}
+                </div>
+                {updateState.kind === "upToDate" && (
+                  <div className="settings-about__status">{t("upToDate")}</div>
+                )}
+                {updateState.kind === "available" && (
+                  <div className="settings-about__status">
+                    {t("updateAvailable", { version: updateState.update.version })}
+                  </div>
+                )}
+                {updateState.kind === "error" && (
+                  <div className="settings-about__status settings-about__status--err">
+                    {t("updateFailed", { error: updateState.message })}
+                  </div>
+                )}
               </div>
             </>
           ) : (

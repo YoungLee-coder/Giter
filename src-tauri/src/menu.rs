@@ -62,9 +62,7 @@ pub fn emit_open_settings<R: Runtime>(app: &AppHandle<R>) {
 pub fn set_settings_label<R: Runtime>(app: &AppHandle<R>, label: &str) -> Result<(), String> {
     let menu = app.menu().ok_or_else(|| "menu unavailable".to_string())?;
     match menu.get(SETTINGS_MENU_ID) {
-        Some(MenuItemKind::MenuItem(item)) => item
-            .set_text(label)
-            .map_err(|e| e.to_string()),
+        Some(MenuItemKind::MenuItem(item)) => item.set_text(label).map_err(|e| e.to_string()),
         _ => Err("settings menu item not found".to_string()),
     }
 }
