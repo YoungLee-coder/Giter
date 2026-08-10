@@ -8,4 +8,4 @@ export {
   translateStage,
 } from "./core";
 export type { Locale, MessageKey, Messages, TranslateParams } from "./types";
-export { I18nProvider, useI18n } from "./I18nProvider";
+export { useI18n, useI18nStore } from "@/stores/i18nStore";

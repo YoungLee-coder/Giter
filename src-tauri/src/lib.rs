@@ -22,6 +22,8 @@ pub fn run() {
             commands::list_repos,
             commands::add_repo,
             commands::remove_repo,
+            commands::remove_repos,
+            commands::reorder_repos,
             commands::refresh_status,
             commands::scan_folder,
             commands::batch_fetch,

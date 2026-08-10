@@ -21,15 +21,64 @@ impl Default for AppState {
     }
 }
 
+async fn status_many(app: &AppHandle, paths: Vec<String>) -> Result<Vec<RepoStatus>, String> {
+    if paths.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let order = paths.clone();
+    let concurrency = settings::load(app)?.concurrency.max(1) as usize;
+    let semaphore = Arc::new(Semaphore::new(concurrency));
+    let mut handles = Vec::with_capacity(paths.len());
+
+    for path in paths {
+        let permit = semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|e| format!("semaphore error: {e}"))?;
+        handles.push(tokio::spawn(async move {
+            let _permit = permit;
+            tokio::task::spawn_blocking(move || git::status(&path))
+                .await
+                .map_err(|e| format!("status join error: {e}"))
+        }));
+    }
+
+    let mut repos = Vec::with_capacity(handles.len());
+    for handle in handles {
+        match handle.await {
+            Ok(Ok(status)) => repos.push(status),
+            Ok(Err(e)) => return Err(e),
+            Err(e) => return Err(format!("status join error: {e}")),
+        }
+    }
+
+    let index: std::collections::HashMap<&str, usize> = order
+        .iter()
+        .enumerate()
+        .map(|(i, path)| (path.as_str(), i))
+        .collect();
+    repos.sort_by_key(|r| index.get(r.path.as_str()).copied().unwrap_or(usize::MAX));
+    Ok(repos)
+}
+
 #[tauri::command]
 pub fn check_git() -> bool {
     git::git_available()
 }
 
 #[tauri::command]
-pub fn list_repos(app: AppHandle) -> Result<Vec<RepoStatus>, String> {
-    let store = store::load(&app)?;
-    Ok(store.repos.iter().map(|r| git::status(&r.path)).collect())
+pub async fn list_repos(app: AppHandle) -> Result<Vec<RepoStatus>, String> {
+    let app_store = app.clone();
+    let paths = tokio::task::spawn_blocking(move || {
+        let store = store::load(&app_store)?;
+        Ok::<_, String>(store.repos.iter().map(|r| r.path.clone()).collect::<Vec<_>>())
+    })
+    .await
+    .map_err(|e| format!("list join error: {e}"))??;
+
+    status_many(&app, paths).await
 }
 
 #[tauri::command]
@@ -50,8 +99,39 @@ pub fn add_repo(app: AppHandle, path: String) -> Result<RepoStatus, String> {
 
 #[tauri::command]
 pub fn remove_repo(app: AppHandle, path: String) -> Result<(), String> {
+    remove_repos(app, vec![path])
+}
+
+#[tauri::command]
+pub fn remove_repos(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let remove: HashSet<String> = paths.into_iter().collect();
     let mut store = store::load(&app)?;
-    store.repos.retain(|r| r.path != path);
+    store.repos.retain(|r| !remove.contains(&r.path));
+    store::save(&app, &store)
+}
+
+#[tauri::command]
+pub fn reorder_repos(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    let mut store = store::load(&app)?;
+    if paths.len() != store.repos.len() {
+        return Err("Path count mismatch".into());
+    }
+
+    let existing: HashSet<String> = store.repos.iter().map(|r| r.path.clone()).collect();
+    let mut seen = HashSet::new();
+    for path in &paths {
+        if !existing.contains(path) {
+            return Err(format!("Unknown path: {path}"));
+        }
+        if !seen.insert(path.clone()) {
+            return Err(format!("Duplicate path: {path}"));
+        }
+    }
+
+    store.repos = paths.into_iter().map(|path| RepoEntry { path }).collect();
     store::save(&app, &store)
 }
 
@@ -84,6 +164,7 @@ pub async fn refresh_status(
         });
     }
 
+    let order = to_check.clone();
     let concurrency = settings::load(&app)?.concurrency.max(1) as usize;
     let semaphore = Arc::new(Semaphore::new(concurrency));
     let mut handles = Vec::with_capacity(to_check.len());
@@ -97,6 +178,7 @@ pub async fn refresh_status(
         let app2 = app.clone();
         handles.push(tokio::spawn(async move {
             let _permit = permit;
+            // Emit start only — skip "done" to cut IPC traffic; UI clears on invoke return.
             let _ = app2.emit(
                 "batch-progress",
                 BatchProgress {
@@ -106,21 +188,9 @@ pub async fn refresh_status(
                 },
             );
 
-            let path_for_status = path.clone();
-            let status = tokio::task::spawn_blocking(move || git::status(&path_for_status))
+            tokio::task::spawn_blocking(move || git::status(&path))
                 .await
-                .map_err(|e| format!("status join error: {e}"))?;
-
-            let _ = app2.emit(
-                "batch-progress",
-                BatchProgress {
-                    path,
-                    stage: "done".into(),
-                    message: None,
-                },
-            );
-
-            Ok::<RepoStatus, String>(status)
+                .map_err(|e| format!("status join error: {e}"))
         }));
     }
 
@@ -134,7 +204,12 @@ pub async fn refresh_status(
     }
 
     if !partial {
-        repos.sort_by(|a, b| a.name.cmp(&b.name));
+        let index: std::collections::HashMap<&str, usize> = order
+            .iter()
+            .enumerate()
+            .map(|(i, path)| (path.as_str(), i))
+            .collect();
+        repos.sort_by_key(|r| index.get(r.path.as_str()).copied().unwrap_or(usize::MAX));
     }
 
     Ok(RefreshResult { repos, removed })
@@ -183,31 +258,38 @@ fn prepare_refresh(app: AppHandle, paths: Option<Vec<String>>) -> Result<Refresh
 }
 
 #[tauri::command]
-pub fn scan_folder(
+pub async fn scan_folder(
     app: AppHandle,
     path: String,
     max_depth: Option<u32>,
 ) -> Result<Vec<RepoStatus>, String> {
-    let depth = match max_depth {
-        Some(d) => d,
-        None => settings::load(&app)?.scan_depth,
-    };
-    let found = scan::scan_folder(&path, depth)?;
-    let mut store = store::load(&app)?;
-    let mut added = Vec::new();
+    let app_scan = app.clone();
+    let added_paths = tokio::task::spawn_blocking(move || {
+        let depth = match max_depth {
+            Some(d) => d,
+            None => settings::load(&app_scan)?.scan_depth,
+        };
+        let found = scan::scan_folder(&path, depth)?;
+        let mut store = store::load(&app_scan)?;
+        let mut added = Vec::new();
 
-    for repo_path in found {
-        if store.repos.iter().any(|r| r.path == repo_path) {
-            continue;
+        for repo_path in found {
+            if store.repos.iter().any(|r| r.path == repo_path) {
+                continue;
+            }
+            store.repos.push(RepoEntry {
+                path: repo_path.clone(),
+            });
+            added.push(repo_path);
         }
-        store.repos.push(RepoEntry {
-            path: repo_path.clone(),
-        });
-        added.push(git::status(&repo_path));
-    }
 
-    store::save(&app, &store)?;
-    Ok(added)
+        store::save(&app_scan, &store)?;
+        Ok::<_, String>(added)
+    })
+    .await
+    .map_err(|e| format!("scan join error: {e}"))??;
+
+    status_many(&app, added_paths).await
 }
 
 async fn with_batch_lock<F, T>(state: &State<'_, AppState>, f: F) -> Result<T, String>
@@ -231,7 +313,7 @@ pub async fn batch_fetch(
     app: AppHandle,
     state: State<'_, AppState>,
     paths: Vec<String>,
-) -> Result<Vec<BatchProgress>, String> {
+) -> Result<Vec<RepoStatus>, String> {
     with_batch_lock(&state, async { run_batch(app, paths, false).await }).await
 }
 
@@ -240,7 +322,7 @@ pub async fn batch_update(
     app: AppHandle,
     state: State<'_, AppState>,
     paths: Vec<String>,
-) -> Result<Vec<BatchProgress>, String> {
+) -> Result<Vec<RepoStatus>, String> {
     with_batch_lock(&state, async { run_batch(app, paths, true).await }).await
 }
 
@@ -248,7 +330,7 @@ async fn run_batch(
     app: AppHandle,
     paths: Vec<String>,
     do_update: bool,
-) -> Result<Vec<BatchProgress>, String> {
+) -> Result<Vec<RepoStatus>, String> {
     if !git::git_available() {
         return Err("git is not available in PATH".into());
     }
@@ -279,51 +361,65 @@ async fn run_batch(
                 },
             );
 
-            let result = tokio::task::spawn_blocking(move || {
-                if do_update {
+            let (progress, status) = tokio::task::spawn_blocking(move || {
+                let progress = if do_update {
                     match git::update_one(&path) {
                         Ok(p) | Err(p) => p,
                     }
                 } else {
                     match git::fetch(&path) {
                         Ok(()) => BatchProgress {
-                            path,
+                            path: path.clone(),
                             stage: "done".into(),
                             message: Some("Fetched".into()),
                         },
                         Err(err) => BatchProgress {
-                            path,
+                            path: path.clone(),
                             stage: "error".into(),
                             message: Some(err),
                         },
                     }
-                }
+                };
+                let status = git::status(&path);
+                (progress, status)
             })
             .await
-            .unwrap_or_else(|e| BatchProgress {
-                path: path_for_emit,
-                stage: "error".into(),
-                message: Some(format!("task join error: {e}")),
+            .unwrap_or_else(|e| {
+                (
+                    BatchProgress {
+                        path: path_for_emit.clone(),
+                        stage: "error".into(),
+                        message: Some(format!("task join error: {e}")),
+                    },
+                    RepoStatus {
+                        path: path_for_emit.clone(),
+                        name: git::repo_name(&path_for_emit),
+                        branch: None,
+                        upstream: None,
+                        ahead: 0,
+                        behind: 0,
+                        dirty: false,
+                        last_error: Some(format!("task join error: {e}")),
+                    },
+                )
             });
 
-            let _ = app2.emit("batch-progress", result.clone());
-            result
+            let _ = app2.emit("batch-progress", progress);
+            status
         }));
     }
 
-    let mut results = Vec::with_capacity(handles.len());
+    let mut repos = Vec::with_capacity(handles.len());
     for handle in handles {
         match handle.await {
-            Ok(p) => results.push(p),
-            Err(e) => results.push(BatchProgress {
-                path: String::new(),
-                stage: "error".into(),
-                message: Some(format!("join error: {e}")),
-            }),
+            Ok(status) => repos.push(status),
+            Err(e) => {
+                return Err(format!("batch join error: {e}"));
+            }
         }
     }
 
-    Ok(results)
+    Ok(repos)
 }
 
 #[tauri::command]
@@ -380,6 +476,7 @@ pub fn update_settings(app: AppHandle, settings: AppSettings) -> Result<AppSetti
 #[tauri::command]
 pub fn get_app_info(app: AppHandle) -> Result<AppInfo, String> {
     Ok(AppInfo {
+        name: app.package_info().name.clone(),
         version: app.package_info().version.to_string(),
         git_available: git::git_available(),
     })

@@ -271,10 +271,18 @@ pub fn detail(path: &str) -> Result<RepoDetail, String> {
         return Err(format!("Not a git repository: {path}"));
     }
 
-    let status = status(path);
-    let remotes = list_remotes(path).unwrap_or_default();
-    let commits = list_commits(path, 12).unwrap_or_default();
-    let changed_files = list_changed_files(path, 30).unwrap_or_default();
+    let (status, remotes, commits, changed_files) = std::thread::scope(|s| {
+        let status_t = s.spawn(|| status(path));
+        let remotes_t = s.spawn(|| list_remotes(path).unwrap_or_default());
+        let commits_t = s.spawn(|| list_commits(path, 12).unwrap_or_default());
+        let files_t = s.spawn(|| list_changed_files(path, 30).unwrap_or_default());
+        (
+            status_t.join().unwrap_or_else(|_| status(path)),
+            remotes_t.join().unwrap_or_default(),
+            commits_t.join().unwrap_or_default(),
+            files_t.join().unwrap_or_default(),
+        )
+    });
 
     Ok(RepoDetail {
         status,

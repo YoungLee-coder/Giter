@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/), and this project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [0.2.0] - 2026-08-10
+
+### Added
+
+- Rebuild the UI on Tailwind CSS, shadcn/ui, and Zustand stores (theme switch, virtualized repo grid, shared motion tokens)
+- Parallel `list_repos` / batch status refresh with the configured concurrency limit
+- Settings sections for Appearance, Scanning, and System; About links to GitHub and Releases
+
+### Changed
+
+- Align UI motion with mainstream practice: press scale feedback, ease-out curves, longer overlay/popover timings, and broader `prefers-reduced-motion` coverage
+- Keep dialog enter/exit opacity-only (no scale/slide) so soft-shadow panels stay smooth on WebKit / Tauri
+- Rename the app binary to `Giter` (`mainBinaryName`)
+
+### Fixed
+
+- Include macOS `app` bundle target so updater artifacts (`darwin-aarch64` / `darwin-x86_64`) are published to `latest.json`
+
 ## [0.1.2] - 2026-08-10
 
 ### Added

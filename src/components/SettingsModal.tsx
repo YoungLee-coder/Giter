@@ -1,61 +1,57 @@
-import { useEffect, useId, useRef, useState } from "react";
-import type { Update } from "@tauri-apps/plugin-updater";
-import { useI18n } from "../i18n";
+import { useEffect, useId, type ReactNode } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-  api,
-  type AppInfo,
-  type GitInfo,
-  type ThemePreference,
-} from "../lib/tauri";
+  ArrowLeftIcon,
+  ChevronRightIcon,
+  ExternalLinkIcon,
+  GitBranchIcon,
+  InfoIcon,
+  RefreshCwIcon,
+} from "lucide-react";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
+import { ThemeSwitch } from "@/components/ThemeSwitch";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  checkForAppUpdate,
-  clearDismissedUpdateVersion,
-  downloadAndInstallUpdate,
-  formatUpdateError,
-  markUpdateChecked,
-  relaunchApp,
-} from "../lib/updater";
-import { useSettings } from "../settings";
-import { LanguageSwitch } from "./LanguageSwitch";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { useI18n } from "@/i18n";
+import { APP_NAME, GITHUB_URL, RELEASES_URL } from "@/lib/app";
+import type { GitInfo } from "@/lib/tauri";
+import { cn } from "@/lib/utils";
+import { useSettingsModalStore } from "@/stores/settingsModalStore";
+import { useSettings } from "@/stores/settingsStore";
 
 type Props = {
   open: boolean;
   onClose: () => void;
 };
 
-type SettingsPane = "main" | "git";
-
-type UpdateUiState =
-  | { kind: "idle" }
-  | { kind: "checking" }
-  | { kind: "upToDate" }
-  | { kind: "available"; update: Update }
-  | { kind: "downloading"; update: Update; percent: number }
-  | { kind: "installing"; update: Update }
-  | { kind: "error"; message: string };
-
-const THEME_OPTIONS: {
-  value: ThemePreference;
-  labelKey: "themeSystem" | "themeLight" | "themeDark";
-}[] = [
-  { value: "system", labelKey: "themeSystem" },
-  { value: "light", labelKey: "themeLight" },
-  { value: "dark", labelKey: "themeDark" },
-];
-
 export function SettingsModal({ open, onClose }: Props) {
   const { t } = useI18n();
-  const { settings, updateSettings } = useSettings();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const [pane, setPane] = useState<SettingsPane>("main");
-  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
-  const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
-  const [gitLoading, setGitLoading] = useState(false);
-  const [scanDepthDraft, setScanDepthDraft] = useState(String(settings.scanDepth));
-  const [concurrencyDraft, setConcurrencyDraft] = useState(
-    String(settings.concurrency),
-  );
-  const [updateState, setUpdateState] = useState<UpdateUiState>({ kind: "idle" });
+  const { settings } = useSettings();
+  const pane = useSettingsModalStore((s) => s.pane);
+  const appInfo = useSettingsModalStore((s) => s.appInfo);
+  const gitInfo = useSettingsModalStore((s) => s.gitInfo);
+  const gitLoading = useSettingsModalStore((s) => s.gitLoading);
+  const scanDepthDraft = useSettingsModalStore((s) => s.scanDepthDraft);
+  const concurrencyDraft = useSettingsModalStore((s) => s.concurrencyDraft);
+  const updateState = useSettingsModalStore((s) => s.updateState);
+  const setPane = useSettingsModalStore((s) => s.setPane);
+  const setScanDepthDraft = useSettingsModalStore((s) => s.setScanDepthDraft);
+  const setConcurrencyDraft = useSettingsModalStore((s) => s.setConcurrencyDraft);
+  const resetOnClose = useSettingsModalStore((s) => s.resetOnClose);
+  const syncDraftsFromSettings = useSettingsModalStore((s) => s.syncDraftsFromSettings);
+  const loadAppInfo = useSettingsModalStore((s) => s.loadAppInfo);
+  const loadGitInfo = useSettingsModalStore((s) => s.loadGitInfo);
+  const commitNumber = useSettingsModalStore((s) => s.commitNumber);
+  const checkForUpdates = useSettingsModalStore((s) => s.checkForUpdates);
+  const installUpdate = useSettingsModalStore((s) => s.installUpdate);
   const scanDepthId = useId();
   const concurrencyId = useId();
   const updateBusy =
@@ -65,370 +61,409 @@ export function SettingsModal({ open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) {
-      setPane("main");
-      setGitInfo(null);
-      setUpdateState({ kind: "idle" });
+      resetOnClose();
       return;
     }
-    setScanDepthDraft(String(settings.scanDepth));
-    setConcurrencyDraft(String(settings.concurrency));
-  }, [open, settings.scanDepth, settings.concurrency]);
+    syncDraftsFromSettings();
+  }, [open, settings.scanDepth, settings.concurrency, resetOnClose, syncDraftsFromSettings]);
 
   useEffect(() => {
     if (!open) return;
-
-    let cancelled = false;
-    void api
-      .getAppInfo()
-      .then((info) => {
-        if (!cancelled) setAppInfo(info);
-      })
-      .catch(() => {
-        if (!cancelled) setAppInfo(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
+    void loadAppInfo();
+    void loadGitInfo();
+  }, [open, loadAppInfo, loadGitInfo]);
 
   useEffect(() => {
     if (!open || pane !== "git") return;
+    void loadGitInfo();
+  }, [open, pane, loadGitInfo]);
 
-    let cancelled = false;
-    setGitLoading(true);
-    void api
-      .getGitInfo()
-      .then((info) => {
-        if (!cancelled) setGitInfo(info);
-      })
-      .catch(() => {
-        if (!cancelled) setGitInfo(null);
-      })
-      .finally(() => {
-        if (!cancelled) setGitLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, pane]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      if (pane !== "main") {
-        setPane("main");
-        return;
-      }
-      onClose();
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const focusable = dialogRef.current?.querySelector<HTMLElement>(
-      "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
-    );
-    focusable?.focus();
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open, onClose, pane]);
-
-  const commitNumber = (
-    field: "scanDepth" | "concurrency",
-    raw: string,
-    min: number,
-    max: number,
-    fallback: number,
-  ) => {
-    const parsed = Number.parseInt(raw, 10);
-    const value = Number.isFinite(parsed)
-      ? Math.min(max, Math.max(min, parsed))
-      : fallback;
-    if (field === "scanDepth") setScanDepthDraft(String(value));
-    else setConcurrencyDraft(String(value));
-    if (settings[field] !== value) {
-      void updateSettings({ [field]: value });
-    }
+  const goPane = (next: "main" | "git" | "about") => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+    setPane(next);
   };
-
-  const onCheckForUpdates = async () => {
-    setUpdateState({ kind: "checking" });
-    markUpdateChecked();
-    try {
-      const update = await checkForAppUpdate();
-      if (!update) {
-        setUpdateState({ kind: "upToDate" });
-        return;
-      }
-      clearDismissedUpdateVersion();
-      setUpdateState({ kind: "available", update });
-    } catch (error) {
-      setUpdateState({ kind: "error", message: formatUpdateError(error) });
-    }
-  };
-
-  const onInstallUpdate = async (update: Update) => {
-    setUpdateState({ kind: "downloading", update, percent: 0 });
-    try {
-      await downloadAndInstallUpdate(update, ({ downloaded, contentLength }) => {
-        const percent =
-          contentLength && contentLength > 0
-            ? Math.min(100, Math.round((downloaded / contentLength) * 100))
-            : 0;
-        setUpdateState({ kind: "downloading", update, percent });
-      });
-      setUpdateState({ kind: "installing", update });
-      await relaunchApp();
-    } catch (error) {
-      setUpdateState({ kind: "error", message: formatUpdateError(error) });
-    }
-  };
-
-  if (!open) return null;
 
   const title =
-    pane === "git" ? t("gitInfoTitle") : t("settingsTitle");
+    pane === "git"
+      ? t("gitInfoTitle")
+      : pane === "about"
+        ? t("aboutLabel")
+        : t("settingsTitle");
+
+  const updateTitle =
+    updateState.kind === "available"
+      ? t("downloadAndInstall")
+      : updateState.kind === "checking"
+        ? t("checkingForUpdates")
+        : updateState.kind === "downloading"
+          ? t("downloadingUpdate", { percent: updateState.percent })
+          : updateState.kind === "installing"
+            ? t("installingUpdate")
+            : t("checkForUpdates");
+
+  const updateHint =
+    updateState.kind === "upToDate"
+      ? t("upToDate")
+      : updateState.kind === "available"
+        ? t("updateAvailable", { version: updateState.update.version })
+        : updateState.kind === "error"
+          ? t("updateFailed", { error: updateState.message })
+          : undefined;
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="presentation">
-      <div
-        ref={dialogRef}
-        className="modal modal--settings"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-title"
-        onClick={(event) => event.stopPropagation()}
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent
+        className="gap-0 overflow-hidden p-0 sm:max-w-lg"
+        showCloseButton={pane === "main"}
+        onEscapeKeyDown={(event) => {
+          if (pane !== "main") {
+            event.preventDefault();
+            goPane("main");
+          }
+        }}
       >
-        <div className="modal__header">
-          <div className="modal__header-start">
+        <DialogHeader
+          className={cn(
+            "border-b border-border/70 px-4 py-3",
+            pane === "main" && "pr-12",
+          )}
+        >
+          <div className="flex min-w-0 items-center gap-2">
             {pane !== "main" && (
-              <button
+              <Button
                 type="button"
-                className="icon-btn ghost"
+                variant="ghost"
+                size="icon-sm"
                 aria-label={t("gitInfoBack")}
                 title={t("gitInfoBack")}
-                onClick={() => setPane("main")}
+                onClick={() => goPane("main")}
               >
-                <BackIcon />
-              </button>
+                <ArrowLeftIcon />
+              </Button>
             )}
-            <h2 id="settings-title" className="modal__title">
-              {title}
-            </h2>
+            <DialogTitle className="truncate">{title}</DialogTitle>
           </div>
-          <button
-            type="button"
-            className="icon-btn ghost"
-            aria-label={t("settingsClose")}
-            onClick={onClose}
-          >
-            <CloseIcon />
-          </button>
-        </div>
+        </DialogHeader>
 
-        <div className="modal__body modal__body--settings">
+        <div className="settings-body min-h-[28rem] px-4 py-4">
           {pane === "main" ? (
-            <>
-              <div className="settings-row">
-                <div className="settings-row__label">
-                  <span className="settings-row__title">{t("langLabel")}</span>
-                  <span className="settings-row__hint">
-                    {t("settingsLanguageHint")}
-                  </span>
-                </div>
-                <LanguageSwitch />
-              </div>
+            <div className="flex min-w-0 flex-col gap-5">
+              <SettingsSection title={t("settingsSectionAppearance")}>
+                <SettingsPrefRow
+                  title={t("langLabel")}
+                  hint={t("settingsLanguageHint")}
+                  control={<LanguageSwitch />}
+                />
+                <SettingsPrefRow
+                  title={t("themeLabel")}
+                  hint={t("themeHint")}
+                  control={<ThemeSwitch />}
+                />
+              </SettingsSection>
 
-              <div className="settings-row">
-                <div className="settings-row__label">
-                  <span className="settings-row__title">{t("themeLabel")}</span>
-                  <span className="settings-row__hint">{t("themeHint")}</span>
-                </div>
-                <div
-                  className="lang-switch"
-                  role="group"
-                  aria-label={t("themeLabel")}
-                >
-                  {THEME_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      className={`lang-switch__btn ${settings.theme === opt.value ? "is-active" : ""}`}
-                      aria-pressed={settings.theme === opt.value}
-                      onClick={() => {
-                        if (settings.theme !== opt.value) {
-                          void updateSettings({ theme: opt.value });
+              <SettingsSection title={t("settingsSectionScanning")}>
+                <SettingsPrefRow
+                  title={t("scanDepthLabel")}
+                  hint={t("scanDepthHint")}
+                  htmlFor={scanDepthId}
+                  control={
+                    <Input
+                      id={scanDepthId}
+                      className="w-[4.25rem] text-center tabular-nums"
+                      type="number"
+                      min={1}
+                      max={10}
+                      inputMode="numeric"
+                      value={scanDepthDraft}
+                      onChange={(event) => setScanDepthDraft(event.target.value)}
+                      onBlur={() =>
+                        commitNumber(
+                          "scanDepth",
+                          scanDepthDraft,
+                          1,
+                          10,
+                          settings.scanDepth,
+                        )
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          (event.target as HTMLInputElement).blur();
                         }
                       }}
-                    >
-                      {t(opt.labelKey)}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                    />
+                  }
+                />
+                <SettingsPrefRow
+                  title={t("concurrencyLabel")}
+                  hint={t("concurrencyHint")}
+                  htmlFor={concurrencyId}
+                  control={
+                    <Input
+                      id={concurrencyId}
+                      className="w-[4.25rem] text-center tabular-nums"
+                      type="number"
+                      min={1}
+                      max={16}
+                      inputMode="numeric"
+                      value={concurrencyDraft}
+                      onChange={(event) => setConcurrencyDraft(event.target.value)}
+                      onBlur={() =>
+                        commitNumber(
+                          "concurrency",
+                          concurrencyDraft,
+                          1,
+                          16,
+                          settings.concurrency,
+                        )
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          (event.target as HTMLInputElement).blur();
+                        }
+                      }}
+                    />
+                  }
+                />
+              </SettingsSection>
 
-              <div className="settings-row">
-                <div className="settings-row__label">
-                  <label className="settings-row__title" htmlFor={scanDepthId}>
-                    {t("scanDepthLabel")}
-                  </label>
-                  <span className="settings-row__hint">{t("scanDepthHint")}</span>
-                </div>
-                <input
-                  id={scanDepthId}
-                  className="settings-number"
-                  type="number"
-                  min={1}
-                  max={10}
-                  inputMode="numeric"
-                  value={scanDepthDraft}
-                  onChange={(event) => setScanDepthDraft(event.target.value)}
-                  onBlur={() =>
-                    commitNumber(
-                      "scanDepth",
-                      scanDepthDraft,
-                      1,
-                      10,
-                      settings.scanDepth,
+              <SettingsSection title={t("settingsSectionSystem")}>
+                <SettingsNavRow
+                  icon={<GitBranchIcon />}
+                  title={t("gitMenuLabel")}
+                  hint={t("gitMenuHint")}
+                  value={
+                    appInfo == null ? (
+                      "…"
+                    ) : (
+                      <Badge
+                        variant={appInfo.gitAvailable ? "secondary" : "destructive"}
+                        className="rounded-[6px]"
+                      >
+                        {appInfo.gitAvailable ? t("gitReady") : t("gitMissing")}
+                      </Badge>
                     )
                   }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      (event.target as HTMLInputElement).blur();
-                    }
-                  }}
+                  onClick={() => goPane("git")}
                 />
-              </div>
-
-              <div className="settings-row">
-                <div className="settings-row__label">
-                  <label
-                    className="settings-row__title"
-                    htmlFor={concurrencyId}
-                  >
-                    {t("concurrencyLabel")}
-                  </label>
-                  <span className="settings-row__hint">
-                    {t("concurrencyHint")}
-                  </span>
-                </div>
-                <input
-                  id={concurrencyId}
-                  className="settings-number"
-                  type="number"
-                  min={1}
-                  max={16}
-                  inputMode="numeric"
-                  value={concurrencyDraft}
-                  onChange={(event) => setConcurrencyDraft(event.target.value)}
-                  onBlur={() =>
-                    commitNumber(
-                      "concurrency",
-                      concurrencyDraft,
-                      1,
-                      16,
-                      settings.concurrency,
+                <SettingsNavRow
+                  icon={
+                    updateBusy ? (
+                      <Spinner className="size-4" />
+                    ) : (
+                      <RefreshCwIcon />
                     )
                   }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      (event.target as HTMLInputElement).blur();
+                  title={updateTitle}
+                  hint={updateHint}
+                  hintTone={updateState.kind === "error" ? "err" : "default"}
+                  disabled={updateBusy}
+                  showChevron={false}
+                  onClick={() => {
+                    if (updateState.kind === "available") {
+                      void installUpdate(updateState.update);
+                      return;
                     }
+                    void checkForUpdates();
                   }}
                 />
-              </div>
-
-              <button
-                type="button"
-                className="settings-row settings-row--nav"
-                onClick={() => setPane("git")}
-              >
-                <div className="settings-row__label">
-                  <span className="settings-row__title">{t("gitMenuLabel")}</span>
-                  <span className="settings-row__hint">{t("gitMenuHint")}</span>
-                </div>
-                <span className="settings-row__trail">
-                  <span className="settings-row__value">
-                    {appInfo == null
-                      ? "…"
-                      : appInfo.gitAvailable
-                        ? t("gitReady")
-                        : t("gitMissing")}
-                  </span>
-                  <ChevronIcon />
-                </span>
-              </button>
-
-              <div className="settings-about">
-                <div className="settings-row__title">{t("aboutLabel")}</div>
-                <div className="settings-about__meta">
-                  <span>
-                    {t("aboutVersion", {
-                      version: appInfo?.version ?? "…",
-                    })}
-                  </span>
-                </div>
-                <div className="settings-about__actions">
-                  {updateState.kind === "available" ? (
-                    <button
-                      type="button"
-                      className="ghost"
-                      onClick={() => void onInstallUpdate(updateState.update)}
-                    >
-                      {t("downloadAndInstall")}
-                    </button>
-                  ) : updateState.kind === "downloading" ||
-                    updateState.kind === "installing" ? (
-                    <button type="button" className="ghost" disabled>
-                      {updateState.kind === "downloading"
-                        ? t("downloadingUpdate", {
-                            percent: updateState.percent,
-                          })
-                        : t("installingUpdate")}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="ghost"
-                      disabled={updateBusy}
-                      onClick={() => void onCheckForUpdates()}
-                    >
-                      {updateState.kind === "checking"
-                        ? t("checkingForUpdates")
-                        : t("checkForUpdates")}
-                    </button>
-                  )}
-                </div>
-                {updateState.kind === "upToDate" && (
-                  <div className="settings-about__status">{t("upToDate")}</div>
-                )}
-                {updateState.kind === "available" && (
-                  <div className="settings-about__status">
-                    {t("updateAvailable", { version: updateState.update.version })}
-                  </div>
-                )}
-                {updateState.kind === "error" && (
-                  <div className="settings-about__status settings-about__status--err">
-                    {t("updateFailed", { error: updateState.message })}
-                  </div>
-                )}
-              </div>
-            </>
+                <SettingsNavRow
+                  icon={<InfoIcon />}
+                  title={t("aboutLabel")}
+                  hint={t("aboutMenuHint")}
+                  value={appInfo?.version ?? "…"}
+                  onClick={() => goPane("about")}
+                />
+              </SettingsSection>
+            </div>
+          ) : pane === "git" ? (
+            <GitInfoPane loading={gitLoading} info={gitInfo} />
           ) : (
-            <GitInfoPane
-              loading={gitLoading}
-              info={gitInfo}
+            <AboutPane
+              name={appInfo?.name ?? APP_NAME}
+              version={appInfo?.version ?? null}
             />
           )}
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SettingsSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="flex min-w-0 flex-col gap-1.5">
+      <h3 className="px-0.5 text-[11px] font-semibold tracking-[0.04em] text-muted-foreground uppercase">
+        {title}
+      </h3>
+      <div className="settings-group soft-panel flex min-w-0 flex-col divide-y divide-border/70">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function SettingsPrefRow({
+  title,
+  hint,
+  control,
+  htmlFor,
+}: {
+  title: string;
+  hint?: string;
+  control: ReactNode;
+  htmlFor?: string;
+}) {
+  return (
+    <div className="settings-group-row flex w-full items-center gap-3 px-3 py-2.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <label
+          htmlFor={htmlFor}
+          className="text-sm font-medium leading-snug"
+        >
+          {title}
+        </label>
+        {hint && (
+          <p className="text-xs leading-snug text-muted-foreground text-pretty">
+            {hint}
+          </p>
+        )}
+      </div>
+      <div className="shrink-0">{control}</div>
+    </div>
+  );
+}
+
+function SettingsNavRow({
+  title,
+  hint,
+  value,
+  onClick,
+  disabled,
+  showChevron = true,
+  hintTone = "default",
+  icon,
+}: {
+  title: string;
+  hint?: string;
+  value?: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  showChevron?: boolean;
+  hintTone?: "default" | "err";
+  icon?: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="settings-group-row settings-group-row--action flex w-full items-center gap-3 px-3 py-2.5 text-left disabled:pointer-events-none disabled:opacity-50"
+    >
+      {icon && (
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-[7px] bg-secondary text-muted-foreground [&_svg]:size-3.5">
+          {icon}
+        </span>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-sm font-medium leading-snug">{title}</span>
+        {hint && (
+          <span
+            className={cn(
+              "text-xs leading-snug text-muted-foreground text-pretty",
+              hintTone === "err" && "text-destructive",
+            )}
+          >
+            {hint}
+          </span>
+        )}
+      </div>
+      {(value || showChevron) && (
+        <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+          {value &&
+            (typeof value === "string" ? (
+              <span className="font-mono text-xs tabular-nums">{value}</span>
+            ) : (
+              value
+            ))}
+          {showChevron && <ChevronRightIcon className="size-4 opacity-60" />}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function AboutPane({ name, version }: { name: string; version: string | null }) {
+  const { t } = useI18n();
+
+  const openExternal = (url: string) => {
+    void openUrl(url).catch(() => {
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="soft-panel flex flex-col items-center gap-3 px-4 py-6 text-center">
+        <img
+          className="size-[4.5rem] rounded-[1.15rem] shadow-[var(--shadow-card)]"
+          src="/app-icon.png"
+          srcSet="/app-icon.png 1x, /app-icon@2x.png 2x"
+          width={72}
+          height={72}
+          alt=""
+        />
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="font-heading text-lg font-semibold tracking-tight">
+            {name}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {t("aboutVersion", { version: version ?? "…" })}
+          </div>
+          <p className="mt-0.5 max-w-[22rem] text-xs leading-relaxed text-muted-foreground text-pretty">
+            {t("tagline")}
+          </p>
+        </div>
+      </div>
+
+      <div className="settings-group soft-panel flex min-w-0 flex-col divide-y divide-border/70">
+        <button
+          type="button"
+          onClick={() => openExternal(GITHUB_URL)}
+          className="settings-group-row settings-group-row--action flex w-full items-center gap-3 px-3 py-2.5 text-left"
+        >
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-sm font-medium">{t("aboutOpenGithub")}</span>
+            <span className="text-xs text-muted-foreground">
+              github.com/YoungLee-coder/giter
+            </span>
+          </div>
+          <ExternalLinkIcon className="size-4 text-muted-foreground opacity-60" />
+        </button>
+        <button
+          type="button"
+          onClick={() => openExternal(RELEASES_URL)}
+          className="settings-group-row settings-group-row--action flex w-full items-center gap-3 px-3 py-2.5 text-left"
+        >
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-sm font-medium">{t("aboutOpenReleases")}</span>
+            <span className="text-xs text-muted-foreground">
+              {t("aboutOpenReleasesHint")}
+            </span>
+          </div>
+          <ExternalLinkIcon className="size-4 text-muted-foreground opacity-60" />
+        </button>
       </div>
     </div>
   );
@@ -444,36 +479,28 @@ function GitInfoPane({
   const { t } = useI18n();
 
   if (loading && !info) {
-    return <div className="settings-git-empty">{t("gitInfoLoading")}</div>;
+    return (
+      <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
+        <Spinner className="size-5" />
+        <p className="text-sm">{t("gitInfoLoading")}</p>
+      </div>
+    );
   }
 
   if (!info || !info.available) {
     return (
-      <div className="settings-git-empty">{t("gitInfoUnavailable")}</div>
+      <div className="soft-panel soft-panel--flat px-4 py-8 text-center">
+        <p className="text-sm text-muted-foreground">{t("gitInfoUnavailable")}</p>
+      </div>
     );
   }
 
   const rows: { label: string; value: string }[] = [
-    {
-      label: t("gitInfoStatus"),
-      value: t("gitReady"),
-    },
-    {
-      label: t("gitInfoVersion"),
-      value: info.version ?? t("gitInfoEmpty"),
-    },
-    {
-      label: t("gitInfoPath"),
-      value: info.path ?? t("gitInfoEmpty"),
-    },
-    {
-      label: t("gitInfoExecPath"),
-      value: info.execPath ?? t("gitInfoEmpty"),
-    },
-    {
-      label: t("gitInfoUserName"),
-      value: info.userName ?? t("gitInfoEmpty"),
-    },
+    { label: t("gitInfoStatus"), value: t("gitReady") },
+    { label: t("gitInfoVersion"), value: info.version ?? t("gitInfoEmpty") },
+    { label: t("gitInfoPath"), value: info.path ?? t("gitInfoEmpty") },
+    { label: t("gitInfoExecPath"), value: info.execPath ?? t("gitInfoEmpty") },
+    { label: t("gitInfoUserName"), value: info.userName ?? t("gitInfoEmpty") },
     {
       label: t("gitInfoUserEmail"),
       value: info.userEmail ?? t("gitInfoEmpty"),
@@ -481,59 +508,20 @@ function GitInfoPane({
   ];
 
   return (
-    <div className="settings-git-list">
+    <div className="settings-group soft-panel flex min-w-0 flex-col divide-y divide-border/70">
       {rows.map((row) => (
-        <div key={row.label} className="settings-git-row">
-          <div className="settings-git-row__label">{row.label}</div>
-          <div className="settings-git-row__value" title={row.value}>
+        <div key={row.label} className="flex min-w-0 flex-col gap-1 px-3 py-2.5">
+          <div className="text-[11px] font-medium tracking-[0.02em] text-muted-foreground">
+            {row.label}
+          </div>
+          <div
+            className="min-w-0 truncate font-mono text-sm select-text"
+            title={row.value}
+          >
             {row.value}
           </div>
         </div>
       ))}
     </div>
-  );
-}
-
-function BackIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-      <path
-        d="M7.4 2.1a.75.75 0 0 1 .05 1.06L4.86 6l2.59 2.84a.75.75 0 1 1-1.11 1.01L3.2 6.53a.75.75 0 0 1 0-1.06l2.14-3.32a.75.75 0 0 1 1.06-.05Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function ChevronIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-      <path
-        d="M3.2 1.3a.75.75 0 0 1 1.06.05L7.05 4.5 4.26 7.65a.75.75 0 1 1-1.11-1.01L5.34 4.5 3.15 2.36a.75.75 0 0 1 .05-1.06Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-      <path
-        d="M2.1 2.1a.75.75 0 0 1 1.06 0L6 4.94l2.84-2.84a.75.75 0 1 1 1.06 1.06L7.06 6l2.84 2.84a.75.75 0 1 1-1.06 1.06L6 7.06 3.16 9.9a.75.75 0 0 1-1.06-1.06L4.94 6 2.1 3.16a.75.75 0 0 1 0-1.06Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-export function SettingsIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M8.7 1.2a.9.9 0 0 0-1.4 0l-.35.42a1.4 1.4 0 0 1-1.45.4l-.52-.17a.9.9 0 0 0-1.08.5l-.35.9a.9.9 0 0 0 .3 1.07l.42.33a1.4 1.4 0 0 1 0 2.16l-.42.33a.9.9 0 0 0-.3 1.07l.35.9a.9.9 0 0 0 1.08.5l.52-.17a1.4 1.4 0 0 1 1.45.4l.35.42a.9.9 0 0 0 1.4 0l.35-.42a1.4 1.4 0 0 1 1.45-.4l.52.17a.9.9 0 0 0 1.08-.5l.35-.9a.9.9 0 0 0-.3-1.07l-.42-.33a1.4 1.4 0 0 1 0-2.16l.42-.33a.9.9 0 0 0 .3-1.07l-.35-.9a.9.9 0 0 0-1.08-.5l-.52.17a1.4 1.4 0 0 1-1.45-.4L8.7 1.2ZM8 10.1A2.1 2.1 0 1 1 8 5.9a2.1 2.1 0 0 1 0 4.2Z"
-      />
-    </svg>
   );
 }

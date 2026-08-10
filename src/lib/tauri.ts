@@ -56,6 +56,7 @@ export type AppSettings = {
 };
 
 export type AppInfo = {
+  name: string;
   version: string;
   gitAvailable: boolean;
 };
@@ -85,6 +86,9 @@ export const api = {
   listRepos: () => invoke<RepoStatus[]>("list_repos"),
   addRepo: (path: string) => invoke<RepoStatus>("add_repo", { path }),
   removeRepo: (path: string) => invoke<void>("remove_repo", { path }),
+  removeRepos: (paths: string[]) => invoke<void>("remove_repos", { paths }),
+  reorderRepos: (paths: string[]) =>
+    invoke<void>("reorder_repos", { paths }),
   refreshStatus: (paths?: string[]) =>
     invoke<RefreshResult>("refresh_status", { paths: paths ?? null }),
   scanFolder: (path: string, maxDepth?: number) =>
@@ -93,9 +97,9 @@ export const api = {
       maxDepth: maxDepth ?? null,
     }),
   batchFetch: (paths: string[]) =>
-    invoke<BatchProgress[]>("batch_fetch", { paths }),
+    invoke<RepoStatus[]>("batch_fetch", { paths }),
   batchUpdate: (paths: string[]) =>
-    invoke<BatchProgress[]>("batch_update", { paths }),
+    invoke<RepoStatus[]>("batch_update", { paths }),
   repoDetail: (path: string) => invoke<RepoDetail>("repo_detail", { path }),
   addRemote: (path: string, name: string, url: string) =>
     invoke<RepoDetail>("add_remote", { path, name, url }),

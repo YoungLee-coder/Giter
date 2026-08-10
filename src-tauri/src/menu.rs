@@ -14,21 +14,24 @@ pub fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .build(app)?;
 
     let app_menu = SubmenuBuilder::new(app, &app_name)
-        .about(Some(AboutMetadata {
-            name: Some(app_name),
-            version: Some(app.package_info().version.to_string()),
-            ..Default::default()
-        }))
+        .about_with_text(
+            format!("About {app_name}"),
+            Some(AboutMetadata {
+                name: Some(app_name.clone()),
+                version: Some(app.package_info().version.to_string()),
+                ..Default::default()
+            }),
+        )
         .separator()
         .item(&settings)
         .separator()
         .services()
         .separator()
-        .hide()
+        .hide_with_text(format!("Hide {app_name}"))
         .hide_others()
         .show_all()
         .separator()
-        .quit()
+        .quit_with_text(format!("Quit {app_name}"))
         .build()?;
 
     let edit_menu = SubmenuBuilder::new(app, "Edit")

@@ -1,226 +1,92 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { useI18n } from "../i18n";
+import { useEffect, useId, useMemo, type FormEvent, type ReactNode } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
-  api,
-  type GithubPublishInfo,
-  type RepoDetail,
-  type RepoStatus,
-} from "../lib/tauri";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { useI18n } from "@/i18n";
+import type { RepoStatus } from "@/lib/tauri";
+import { useRepoDetailStore } from "@/stores/repoDetailStore";
 
 type Props = {
   repo: RepoStatus | null;
   onClose: () => void;
 };
 
-type RemoteMode = "idle" | "publish" | "addUrl";
-
 export function RepoDetailModal({ repo, onClose }: Props) {
   const { t, locale } = useI18n();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const [detail, setDetail] = useState<RepoDetail | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [remoteMode, setRemoteMode] = useState<RemoteMode>("idle");
-  const [publishName, setPublishName] = useState("");
-  const [publishInfo, setPublishInfo] = useState<GithubPublishInfo | null>(null);
-  const [publishInfoLoading, setPublishInfoLoading] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-  const [remoteName, setRemoteName] = useState("origin");
-  const [remoteUrl, setRemoteUrl] = useState("");
-  const [savingRemote, setSavingRemote] = useState(false);
+  const detail = useRepoDetailStore((s) => s.detail);
+  const loading = useRepoDetailStore((s) => s.loading);
+  const error = useRepoDetailStore((s) => s.error);
+  const remoteMode = useRepoDetailStore((s) => s.remoteMode);
+  const publishName = useRepoDetailStore((s) => s.publishName);
+  const publishInfo = useRepoDetailStore((s) => s.publishInfo);
+  const publishInfoLoading = useRepoDetailStore((s) => s.publishInfoLoading);
+  const publishing = useRepoDetailStore((s) => s.publishing);
+  const remoteName = useRepoDetailStore((s) => s.remoteName);
+  const remoteUrl = useRepoDetailStore((s) => s.remoteUrl);
+  const savingRemote = useRepoDetailStore((s) => s.savingRemote);
+  const setError = useRepoDetailStore((s) => s.setError);
+  const setRemoteMode = useRepoDetailStore((s) => s.setRemoteMode);
+  const setPublishName = useRepoDetailStore((s) => s.setPublishName);
+  const setRemoteName = useRepoDetailStore((s) => s.setRemoteName);
+  const setRemoteUrl = useRepoDetailStore((s) => s.setRemoteUrl);
+  const reset = useRepoDetailStore((s) => s.reset);
+  const resetRemoteForm = useRepoDetailStore((s) => s.resetRemoteForm);
+  const openRepo = useRepoDetailStore((s) => s.openRepo);
+  const loadPublishInfo = useRepoDetailStore((s) => s.loadPublishInfo);
+  const reveal = useRepoDetailStore((s) => s.reveal);
+  const publish = useRepoDetailStore((s) => s.publish);
+  const addRemote = useRepoDetailStore((s) => s.addRemote);
   const publishNameId = useId();
   const remoteNameId = useId();
   const remoteUrlId = useId();
 
-  const resetRemoteForm = () => {
-    setRemoteMode("idle");
-    setPublishName(repo?.name ?? "");
-    setPublishInfo(null);
-    setPublishInfoLoading(false);
-    setPublishing(false);
-    setRemoteName("origin");
-    setRemoteUrl("");
-    setSavingRemote(false);
-  };
-
   useEffect(() => {
     if (!repo) {
-      setDetail(null);
-      setError(null);
-      setLoading(false);
-      setRemoteMode("idle");
-      setPublishName("");
-      setPublishInfo(null);
-      setPublishInfoLoading(false);
-      setPublishing(false);
-      setRemoteName("origin");
-      setRemoteUrl("");
-      setSavingRemote(false);
+      reset();
       return;
     }
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setDetail(null);
-    setRemoteMode("idle");
-    setPublishName(repo.name);
-    setPublishInfo(null);
-    setPublishInfoLoading(false);
-    setPublishing(false);
-    setRemoteName("origin");
-    setRemoteUrl("");
-    setSavingRemote(false);
-
-    void api
-      .repoDetail(repo.path)
-      .then((result) => {
-        if (!cancelled) setDetail(result);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [repo]);
-
-  useEffect(() => {
-    if (!repo) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      if (remoteMode !== "idle") {
-        setRemoteMode("idle");
-        setPublishName(repo.name);
-        setPublishInfo(null);
-        setPublishing(false);
-        setRemoteName("origin");
-        setRemoteUrl("");
-        setSavingRemote(false);
-        return;
-      }
-      onClose();
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const focusable = dialogRef.current?.querySelector<HTMLElement>(
-      "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
-    );
-    focusable?.focus();
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [repo, onClose, remoteMode]);
+    void openRepo(repo);
+  }, [repo, openRepo, reset]);
 
   useEffect(() => {
     if (remoteMode !== "publish" || !repo) return;
+    void loadPublishInfo();
+  }, [remoteMode, repo, loadPublishInfo]);
 
-    let cancelled = false;
-    setPublishInfoLoading(true);
-    void api
-      .githubPublishInfo()
-      .then((info) => {
-        if (!cancelled) setPublishInfo(info);
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setPublishInfo({ available: false, login: null });
-          setError(String(e));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setPublishInfoLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [remoteMode, repo]);
-
-  useEffect(() => {
-    if (remoteMode === "publish") {
-      const input = dialogRef.current?.querySelector<HTMLInputElement>(
-        `#${CSS.escape(publishNameId)}`,
-      );
-      input?.focus();
-      input?.select();
-      return;
-    }
-    if (remoteMode === "addUrl") {
-      const input = dialogRef.current?.querySelector<HTMLInputElement>(
-        `#${CSS.escape(remoteUrlId)}`,
-      );
-      input?.focus();
-      input?.select();
-    }
-  }, [remoteMode, publishNameId, remoteUrlId]);
+  const dateFmt = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }),
+    [locale],
+  );
 
   if (!repo) return null;
 
   const status = detail?.status ?? repo;
-  const dateFmt = new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? iso : dateFmt.format(d);
   };
 
-  const onReveal = async () => {
-    try {
-      await revealItemInDir(repo.path);
-    } catch (e) {
-      setError(String(e));
-    }
-  };
-
-  const onPublish = async (privateRepo: boolean) => {
-    const name = publishName.trim();
-    if (!name || publishing) return;
-
-    setPublishing(true);
-    setError(null);
-    try {
-      const result = await api.publishToGithub(repo.path, name, privateRepo);
-      setDetail(result);
-      resetRemoteForm();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setPublishing(false);
-    }
-  };
-
   const onAddRemote = async (event: FormEvent) => {
     event.preventDefault();
-    const name = remoteName.trim();
-    const url = remoteUrl.trim();
-    if (!name || !url || savingRemote) return;
-
-    setSavingRemote(true);
-    setError(null);
-    try {
-      const result = await api.addRemote(repo.path, name, url);
-      setDetail(result);
-      resetRemoteForm();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setSavingRemote(false);
-    }
+    await addRemote(repo.path);
   };
 
   const publishPreview = () => {
@@ -234,11 +100,11 @@ export function RepoDetailModal({ repo, onClose }: Props) {
   const renderRemoteSection = () => {
     if ((detail?.remotes.length ?? 0) > 0) {
       return (
-        <ul className="detail-list">
+        <ul className="soft-panel flex min-w-0 flex-col divide-y divide-border/80">
           {detail?.remotes.map((remote) => (
-            <li key={remote.name} className="detail-list__item">
-              <span className="detail-list__label">{remote.name}</span>
-              <span className="detail-list__value mono" title={remote.url}>
+            <li key={remote.name} className="flex min-w-0 flex-col gap-1 px-3 py-2.5">
+              <span className="text-xs text-muted-foreground">{remote.name}</span>
+              <span className="min-w-0 truncate font-mono text-sm" title={remote.url}>
                 {remote.url}
               </span>
             </li>
@@ -256,86 +122,95 @@ export function RepoDetailModal({ repo, onClose }: Props) {
         !publishInfoLoading;
 
       return (
-        <div className="detail-publish">
-          <p className="detail-empty">{t("detailPublishHint")}</p>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">{t("detailPublishHint")}</p>
 
           {publishInfoLoading && (
-            <p className="detail-empty">{t("detailLoading")}</p>
+            <p className="text-sm text-muted-foreground">{t("detailLoading")}</p>
           )}
 
           {!publishInfoLoading && publishInfo && !publishInfo.available && (
-            <p className="detail-empty">{t("detailPublishGhMissing")}</p>
+            <p className="text-sm text-muted-foreground">
+              {t("detailPublishGhMissing")}
+            </p>
           )}
 
           {!publishInfoLoading &&
             publishInfo?.available &&
             !publishInfo.login && (
-              <p className="detail-empty">{t("detailPublishGhAuth")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("detailPublishGhAuth")}
+              </p>
             )}
 
           {!publishInfoLoading && publishInfo?.available && publishInfo.login && (
             <>
-              <label className="detail-remote-form__field" htmlFor={publishNameId}>
-                <span>{t("detailPublishRepoName")}</span>
-                <input
+              <Field>
+                <FieldLabel htmlFor={publishNameId}>
+                  {t("detailPublishRepoName")}
+                </FieldLabel>
+                <Input
                   id={publishNameId}
-                  className="detail-remote-form__input"
                   value={publishName}
                   onChange={(e) => setPublishName(e.target.value)}
                   autoComplete="off"
                   spellCheck={false}
                   disabled={publishing}
                   required
+                  autoFocus
                 />
-              </label>
+              </Field>
 
-              <div className="detail-publish__choices" role="group">
-                <button
+              <div className="grid gap-2 sm:grid-cols-2" role="group">
+                <Button
                   type="button"
-                  className="detail-publish__choice"
+                  variant="outline"
+                  className="h-auto flex-col items-start gap-1 px-3 py-3"
                   disabled={!canPublish}
-                  onClick={() => void onPublish(false)}
+                  onClick={() => void publish(repo.path, false)}
                 >
-                  <span className="detail-publish__choice-title mono">
-                    {publishPreview()}
-                  </span>
-                  <span className="detail-publish__choice-meta">
+                  <span className="font-mono text-sm">{publishPreview()}</span>
+                  <span className="text-xs text-muted-foreground">
                     {t("detailPublishPublic")}
                   </span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="detail-publish__choice"
+                  variant="outline"
+                  className="h-auto flex-col items-start gap-1 px-3 py-3"
                   disabled={!canPublish}
-                  onClick={() => void onPublish(true)}
+                  onClick={() => void publish(repo.path, true)}
                 >
-                  <span className="detail-publish__choice-title mono">
-                    {publishPreview()}
-                  </span>
-                  <span className="detail-publish__choice-meta">
+                  <span className="font-mono text-sm">{publishPreview()}</span>
+                  <span className="text-xs text-muted-foreground">
                     {t("detailPublishPrivate")}
                   </span>
-                </button>
+                </Button>
               </div>
 
               {publishing && (
-                <p className="detail-empty">{t("detailPublishWorking")}</p>
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Spinner />
+                  {t("detailPublishWorking")}
+                </p>
               )}
             </>
           )}
 
-          <div className="detail-remote-form__actions">
-            <button
+          <div className="flex flex-wrap gap-2">
+            <Button
               type="button"
-              className="ghost"
-              onClick={resetRemoteForm}
+              variant="ghost"
+              size="sm"
+              onClick={() => resetRemoteForm(repo.name)}
               disabled={publishing}
             >
               {t("detailRemoteCancel")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="ghost detail-empty__action"
+              variant="outline"
+              size="sm"
               onClick={() => {
                 setError(null);
                 setRemoteMode("addUrl");
@@ -343,7 +218,7 @@ export function RepoDetailModal({ repo, onClose }: Props) {
               disabled={publishing}
             >
               {t("detailAddRemoteUrl")}
-            </button>
+            </Button>
           </div>
         </div>
       );
@@ -351,13 +226,12 @@ export function RepoDetailModal({ repo, onClose }: Props) {
 
     if (remoteMode === "addUrl") {
       return (
-        <form className="detail-remote-form" onSubmit={onAddRemote}>
-          <div className="detail-remote-form__fields">
-            <label className="detail-remote-form__field" htmlFor={remoteNameId}>
-              <span>{t("detailRemoteName")}</span>
-              <input
+        <form className="flex flex-col gap-3" onSubmit={(e) => void onAddRemote(e)}>
+          <FieldGroup className="gap-3">
+            <Field>
+              <FieldLabel htmlFor={remoteNameId}>{t("detailRemoteName")}</FieldLabel>
+              <Input
                 id={remoteNameId}
-                className="detail-remote-form__input"
                 value={remoteName}
                 onChange={(e) => setRemoteName(e.target.value)}
                 autoComplete="off"
@@ -365,15 +239,12 @@ export function RepoDetailModal({ repo, onClose }: Props) {
                 disabled={savingRemote}
                 required
               />
-            </label>
-            <label
-              className="detail-remote-form__field detail-remote-form__field--grow"
-              htmlFor={remoteUrlId}
-            >
-              <span>{t("detailRemoteUrl")}</span>
-              <input
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={remoteUrlId}>{t("detailRemoteUrl")}</FieldLabel>
+              <Input
                 id={remoteUrlId}
-                className="detail-remote-form__input mono"
+                className="font-mono"
                 value={remoteUrl}
                 onChange={(e) => setRemoteUrl(e.target.value)}
                 placeholder="git@github.com:user/repo.git"
@@ -381,21 +252,24 @@ export function RepoDetailModal({ repo, onClose }: Props) {
                 spellCheck={false}
                 disabled={savingRemote}
                 required
+                autoFocus
               />
-            </label>
-          </div>
-          <div className="detail-remote-form__actions">
-            <button
+            </Field>
+          </FieldGroup>
+          <div className="flex flex-wrap gap-2">
+            <Button
               type="button"
-              className="ghost"
-              onClick={resetRemoteForm}
+              variant="ghost"
+              size="sm"
+              onClick={() => resetRemoteForm(repo.name)}
               disabled={savingRemote}
             >
               {t("detailRemoteCancel")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="ghost detail-empty__action"
+              variant="outline"
+              size="sm"
               onClick={() => {
                 setError(null);
                 setRemoteMode("publish");
@@ -403,27 +277,26 @@ export function RepoDetailModal({ repo, onClose }: Props) {
               disabled={savingRemote}
             >
               {t("detailPublishGithub")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="primary"
-              disabled={
-                savingRemote || !remoteName.trim() || !remoteUrl.trim()
-              }
+              size="sm"
+              disabled={savingRemote || !remoteName.trim() || !remoteUrl.trim()}
             >
               {t("add")}
-            </button>
+            </Button>
           </div>
         </form>
       );
     }
 
     return (
-      <div className="detail-empty-row">
-        <p className="detail-empty">{t("detailNoRemotes")}</p>
-        <button
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-sm text-muted-foreground">{t("detailNoRemotes")}</p>
+        <Button
           type="button"
-          className="ghost detail-empty__action"
+          variant="outline"
+          size="sm"
           onClick={() => {
             setError(null);
             setPublishName(status.name);
@@ -431,145 +304,168 @@ export function RepoDetailModal({ repo, onClose }: Props) {
           }}
         >
           {t("detailPublishGithub")}
-        </button>
+        </Button>
       </div>
     );
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="presentation">
-      <div
-        ref={dialogRef}
-        className="modal modal--wide"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="repo-detail-title"
-        onClick={(event) => event.stopPropagation()}
+    <Dialog
+      open={!!repo}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent
+        className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+        showCloseButton
+        onEscapeKeyDown={(event) => {
+          if (remoteMode !== "idle") {
+            event.preventDefault();
+            resetRemoteForm(repo.name);
+          }
+        }}
       >
-        <div className="modal__header">
-          <div className="modal__heading">
-            <h2 id="repo-detail-title" className="modal__title">
-              {status.name}
-            </h2>
-            <p className="modal__subtitle mono" title={status.path}>
-              {status.path}
-            </p>
-          </div>
-          <div className="modal__header-actions">
-            <button type="button" className="ghost" onClick={onReveal}>
-              {t("detailReveal")}
-            </button>
-            <button
+        <DialogHeader className="shrink-0 gap-3 border-b border-border/80 bg-muted/25 p-4 pr-12">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <DialogTitle className="truncate">{status.name}</DialogTitle>
+              <DialogDescription
+                className="mt-1 truncate font-mono text-xs"
+                title={status.path}
+              >
+                {status.path}
+              </DialogDescription>
+            </div>
+            <Button
               type="button"
-              className="icon-btn ghost"
-              aria-label={t("settingsClose")}
-              onClick={onClose}
+              variant="outline"
+              size="sm"
+              onClick={() => void reveal(repo.path)}
             >
-              <CloseIcon />
-            </button>
+              {t("detailReveal")}
+            </Button>
           </div>
-        </div>
+        </DialogHeader>
 
-        <div className="modal__body modal__body--scroll">
-          {loading && <p className="detail-loading">{t("detailLoading")}</p>}
-          {error && <div className="banner err detail-banner">{error}</div>}
+        <div className="giter-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="flex flex-col gap-6 p-4">
+            {loading && (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Spinner />
+                {t("detailLoading")}
+              </p>
+            )}
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-          {!loading && (
-            <>
-              <section className="detail-section">
-                <h3 className="detail-section__title">{t("detailOverview")}</h3>
-                <dl className="detail-grid">
-                  <div className="detail-field">
-                    <dt>{t("colBranch")}</dt>
-                    <dd className="mono">{status.branch ?? "—"}</dd>
-                  </div>
-                  <div className="detail-field">
-                    <dt>{t("detailUpstream")}</dt>
-                    <dd className="mono">{status.upstream ?? t("noUpstream")}</dd>
-                  </div>
-                  <div className="detail-field">
-                    <dt>{t("colSync")}</dt>
-                    <dd>
+            {!loading && (
+              <>
+                <section className="flex flex-col gap-3">
+                  <h3 className="text-sm font-medium">{t("detailOverview")}</h3>
+                  <dl className="grid gap-3 sm:grid-cols-2">
+                    <DetailField label={t("colBranch")}>
+                      <span className="font-mono">{status.branch ?? "—"}</span>
+                    </DetailField>
+                    <DetailField label={t("detailUpstream")}>
+                      <span className="min-w-0 break-all font-mono">
+                        {status.upstream ?? t("noUpstream")}
+                      </span>
+                    </DetailField>
+                    <DetailField label={t("colSync")}>
                       {!status.upstream
                         ? t("noUpstream")
                         : status.ahead === 0 && status.behind === 0
                           ? t("synced")
                           : `↑${status.ahead} ↓${status.behind}`}
-                    </dd>
-                  </div>
-                  <div className="detail-field">
-                    <dt>{t("colStatus")}</dt>
-                    <dd>
+                    </DetailField>
+                    <DetailField label={t("colStatus")}>
                       {status.lastError
                         ? t("error")
                         : status.dirty
                           ? t("dirty")
                           : t("clean")}
-                    </dd>
-                  </div>
-                </dl>
-                {status.lastError && (
-                  <p className="detail-error mono">{status.lastError}</p>
-                )}
-              </section>
+                    </DetailField>
+                  </dl>
+                  {status.lastError && (
+                    <p className="soft-panel soft-panel--flat border-destructive/30 bg-destructive/10 px-3 py-2 font-mono text-xs break-all text-destructive">
+                      {status.lastError}
+                    </p>
+                  )}
+                </section>
 
-              <section className="detail-section">
-                <h3 className="detail-section__title">{t("detailRemotes")}</h3>
-                {renderRemoteSection()}
-              </section>
+                <section className="flex min-w-0 flex-col gap-3">
+                  <h3 className="text-sm font-medium">{t("detailRemotes")}</h3>
+                  {renderRemoteSection()}
+                </section>
 
-              <section className="detail-section">
-                <h3 className="detail-section__title">{t("detailChanges")}</h3>
-                {(detail?.changedFiles.length ?? 0) === 0 ? (
-                  <p className="detail-empty">{t("detailNoChanges")}</p>
-                ) : (
-                  <ul className="detail-list detail-list--files">
-                    {detail?.changedFiles.map((file) => (
-                      <li key={file} className="detail-list__item mono">
-                        {file}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+                <section className="flex min-w-0 flex-col gap-3">
+                  <h3 className="text-sm font-medium">{t("detailChanges")}</h3>
+                  {(detail?.changedFiles.length ?? 0) === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("detailNoChanges")}
+                    </p>
+                  ) : (
+                    <ul className="soft-panel flex min-w-0 flex-col divide-y divide-border/80">
+                      {detail?.changedFiles.map((file) => (
+                        <li
+                          key={file}
+                          className="min-w-0 break-all px-3 py-2 font-mono text-sm"
+                        >
+                          {file}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
 
-              <section className="detail-section">
-                <h3 className="detail-section__title">{t("detailCommits")}</h3>
-                {(detail?.commits.length ?? 0) === 0 ? (
-                  <p className="detail-empty">{t("detailNoCommits")}</p>
-                ) : (
-                  <ul className="detail-commits">
-                    {detail?.commits.map((commit) => (
-                      <li key={commit.hash} className="detail-commit">
-                        <div className="detail-commit__top">
-                          <span className="detail-commit__hash mono">
-                            {commit.shortHash}
-                          </span>
-                          <span className="detail-commit__meta">
-                            {commit.author} · {formatDate(commit.date)}
-                          </span>
-                        </div>
-                        <p className="detail-commit__subject">{commit.subject}</p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            </>
-          )}
+                <section className="flex min-w-0 flex-col gap-3">
+                  <h3 className="text-sm font-medium">{t("detailCommits")}</h3>
+                  {(detail?.commits.length ?? 0) === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("detailNoCommits")}
+                    </p>
+                  ) : (
+                    <ul className="soft-panel flex min-w-0 flex-col divide-y divide-border/80">
+                      {detail?.commits.map((commit) => (
+                        <li key={commit.hash} className="flex min-w-0 flex-col gap-1 px-3 py-2.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {commit.shortHash}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {commit.author} · {formatDate(commit.date)}
+                            </span>
+                          </div>
+                          <p className="text-sm break-words">{commit.subject}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function CloseIcon() {
+function DetailField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-      <path
-        d="M2.1 2.1a.75.75 0 0 1 1.06 0L6 4.94l2.84-2.84a.75.75 0 1 1 1.06 1.06L7.06 6l2.84 2.84a.75.75 0 1 1-1.06 1.06L6 7.06 3.16 9.9a.75.75 0 0 1-1.06-1.06L4.94 6 2.1 3.16a.75.75 0 0 1 0-1.06Z"
-        fill="currentColor"
-      />
-    </svg>
+    <div className="soft-panel flex min-w-0 flex-col gap-1 px-3 py-2.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 text-sm">{children}</dd>
+    </div>
   );
 }

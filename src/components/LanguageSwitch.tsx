@@ -1,4 +1,5 @@
-import { useI18n, type Locale } from "../i18n";
+import { useI18n, type Locale } from "@/i18n";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const OPTIONS: { value: Locale; labelKey: "langEn" | "langZh" }[] = [
   { value: "en", labelKey: "langEn" },
@@ -9,18 +10,27 @@ export function LanguageSwitch() {
   const { locale, setLocale, t } = useI18n();
 
   return (
-    <div className="lang-switch" role="group" aria-label={t("langLabel")}>
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      spacing={0}
+      value={locale}
+      onValueChange={(value) => {
+        if (value === "en" || value === "zh-CN") setLocale(value);
+      }}
+      aria-label={t("langLabel")}
+      className="mac-segment"
+    >
       {OPTIONS.map((opt) => (
-        <button
+        <ToggleGroupItem
           key={opt.value}
-          type="button"
-          className={`lang-switch__btn ${locale === opt.value ? "is-active" : ""}`}
-          aria-pressed={locale === opt.value}
-          onClick={() => setLocale(opt.value)}
+          value={opt.value}
+          className="mac-segment-item mac-segment-item--lang"
         >
           {t(opt.labelKey)}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

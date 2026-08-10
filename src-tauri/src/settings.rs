@@ -41,6 +41,7 @@ impl AppSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppInfo {
+    pub name: String,
     pub version: String,
     pub git_available: bool,
 }
