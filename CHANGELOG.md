@@ -6,6 +6,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-11
+
+### Added
+
+- Remote provider detection (GitHub, GitLab, Bitbucket, Gitea, Codeberg, Azure DevOps) with icons on repo cards
+- TanStack Query for repo and settings data; Sonner toasts for operation feedback
+- i18next with JSON locale files (replacing the custom i18n module)
+- Zod-validated settings schema with Vitest unit tests
+- Drag-and-drop repo reordering via `@dnd-kit`
+- Prettier formatting scripts
+
+### Changed
+
+- Replace Zustand stores with React hooks and `AppUiProvider` context
+- Migrate package manager from npm to pnpm; release CI installs with pnpm
+- Refactor settings modal with `react-hook-form`
+
+### Removed
+
+- Zustand dependency and store modules
+- Custom i18n core/types and TypeScript locale modules
+
 ## [0.2.0] - 2026-08-10
 
 ### Added

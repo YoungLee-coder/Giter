@@ -1,5 +1,5 @@
-import { useI18n, type Locale } from "@/i18n";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useI18n, type Locale } from "@/hooks/useI18n";
 
 const OPTIONS: { value: Locale; labelKey: "langEn" | "langZh" }[] = [
   { value: "en", labelKey: "langEn" },

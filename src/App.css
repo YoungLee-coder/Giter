@@ -68,7 +68,6 @@
     --warn: #9a6700;
     --run: #0071e3;
     --repo-hover: color-mix(in srgb, var(--primary) 18%, var(--card));
-    --repo-selected: color-mix(in srgb, var(--primary) 14%, var(--card));
     --radius: 0.75rem;
     --shadow-control: 0 1px 2px rgba(15, 23, 42, 0.04),
       0 1px 1px rgba(15, 23, 42, 0.03);
@@ -79,18 +78,13 @@
     --shadow-dialog: 0 8px 28px rgba(15, 23, 42, 0.12),
       0 2px 8px rgba(15, 23, 42, 0.06);
 
-    /* Motion tokens — keep in sync with src/lib/motion.ts */
-    --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --motion-ease-out-soft: cubic-bezier(0.2, 0, 0, 1);
-    --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
-    --motion-duration-press: 100ms;
+    /* Motion tokens — cc-switch style (ease-out / duration-200|300) */
+    --motion-ease: ease;
+    --motion-ease-out: ease-out;
+    --motion-ease-in-out: ease-in-out;
+    --motion-duration-fast: 150ms;
     --motion-duration-color: 200ms;
-    --motion-duration-overlay: 200ms;
-    --motion-duration-overlay-out: 140ms;
-    --motion-duration-dialog: 220ms;
-    --motion-duration-dialog-out: 150ms;
-    --motion-press-scale: 0.97;
-    --motion-card-press-scale: 0.97;
+    --motion-duration-panel: 300ms;
 }
 
 .dark {
@@ -118,7 +112,6 @@
     --warn: #ffd60a;
     --run: #64d2ff;
     --repo-hover: color-mix(in srgb, var(--primary) 22%, var(--card));
-    --repo-selected: color-mix(in srgb, var(--primary) 20%, var(--card));
     --shadow-control: 0 1px 2px rgba(0, 0, 0, 0.35);
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28),
       0 6px 16px rgba(0, 0, 0, 0.28);
@@ -131,6 +124,8 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
   html {
     @apply font-sans antialiased;
@@ -140,6 +135,7 @@
     -moz-osx-font-smoothing: grayscale;
     -webkit-user-select: none;
     user-select: none;
+    overscroll-behavior: none;
   }
   body {
     @apply bg-background text-foreground overflow-hidden;
@@ -156,6 +152,11 @@
   .font-mono {
     font-family: var(--font-mono);
   }
+}
+
+/* Match cc-switch: scrollable content without a visible scrollbar */
+::-webkit-scrollbar {
+  display: none;
 }
 
 /* macOS control / segmented helpers */
@@ -189,10 +190,9 @@
   letter-spacing: -0.01em;
   line-height: 1;
   transition:
-    color var(--motion-duration-color) var(--motion-ease-out-soft),
-    background-color var(--motion-duration-color) var(--motion-ease-out-soft),
-    box-shadow var(--motion-duration-color) var(--motion-ease-out-soft),
-    transform var(--motion-duration-press) var(--motion-ease-out);
+    color var(--motion-duration-color) var(--motion-ease-out),
+    background-color var(--motion-duration-color) var(--motion-ease-out),
+    box-shadow var(--motion-duration-color) var(--motion-ease-out);
 }
 
 .mac-segment .mac-segment-item--lang {
@@ -204,10 +204,6 @@
 .mac-segment [data-slot="toggle-group-item"]:hover {
   color: var(--foreground);
   background: transparent;
-}
-
-.mac-segment [data-slot="toggle-group-item"]:active {
-  transform: scale(var(--motion-press-scale));
 }
 
 .mac-segment [data-slot="toggle-group-item"][data-state="on"] {
@@ -230,10 +226,9 @@
   opacity: 1;
 }
 
-/* Tauri window chrome */
-.app-toolbar {
+/* Tauri window chrome — drag bar (traffic lights) + fixed app header */
+.app-header {
   user-select: none;
-  background: var(--toolbar);
 }
 
 [data-tauri-drag-region] {
@@ -241,85 +236,52 @@
   -webkit-app-region: drag;
 }
 
-.app-toolbar button,
-.app-toolbar input,
-.app-toolbar a,
-.app-toolbar [role="button"],
-.app-toolbar [data-slot="button"],
-.app-toolbar [data-slot="checkbox"],
-.app-toolbar [data-slot="dropdown-menu-trigger"],
-.app-toolbar [data-slot="popover-trigger"] {
+[data-tauri-no-drag],
+[data-tauri-drag-region] .no-drag {
   app-region: no-drag;
   -webkit-app-region: no-drag;
 }
 
-html[data-platform="mac"] .app-toolbar {
-  padding-left: 5.25rem;
+.app-header button,
+.app-header input,
+.app-header a,
+.app-header [role="button"],
+.app-header [data-slot="button"],
+.app-header [data-slot="checkbox"],
+.app-header [data-slot="dropdown-menu-trigger"],
+.app-header [data-slot="popover-trigger"] {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
 }
 
-/* Repo soft tiles — layered card on canvas, primary-tint hover/select. */
+/* Repo cards — hover/selected: primary border + light shadow (cc-switch hover). */
 .repo-card {
   --card-spacing: 0.875rem;
+  position: relative;
+  overflow: hidden;
   border-radius: var(--radius-lg);
   background: var(--card);
   box-shadow: var(--shadow-card);
   border-color: color-mix(in srgb, var(--border) 80%, transparent);
   transition:
-    background-color var(--motion-duration-color) var(--motion-ease-out-soft),
-    opacity var(--motion-duration-color) var(--motion-ease-out-soft),
-    border-color var(--motion-duration-color) var(--motion-ease-out-soft);
+    box-shadow var(--motion-duration-panel) var(--motion-ease-out),
+    opacity var(--motion-duration-color) var(--motion-ease-out),
+    border-color var(--motion-duration-panel) var(--motion-ease-out);
 }
 
-.repo-card:not(.is-drag-slot):not(.is-long-pressing):hover {
-  background: var(--repo-hover);
-  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
-}
-
+.repo-card:not(.is-dragging):hover,
 .repo-card.is-selected {
-  background: var(--repo-selected);
-  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  border-color: var(--primary);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
-.repo-card.is-selected:hover {
-  background: color-mix(in srgb, var(--primary) 22%, var(--card));
-}
-
-.dark .repo-card.is-selected:hover {
-  background: color-mix(in srgb, var(--primary) 28%, var(--card));
-}
-
-.repo-card--float {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 40;
-  margin: 0;
-  pointer-events: none;
-  will-change: transform;
-}
-
-.repo-card--lifted {
-  /* Same surface as resting card — no lift/scale chrome while dragging. */
-  box-shadow: var(--shadow-card);
-}
-
-/* Placeholder keeps layout size but must stay invisible under the float.
-   A dashed/muted slot peeks out as a “UI change” when the float is even 1px off. */
-.repo-card.is-drag-slot {
-  opacity: 0;
+/* In-place drag affordance (cc-switch style) — never opacity:0; that fades
+   back in on drop and reads as a flash. */
+.repo-card.is-dragging {
   cursor: grabbing;
-  box-shadow: none;
-  pointer-events: none;
-}
-
-.repo-card.is-drag-slot:hover {
-  background: var(--card);
-  border-color: color-mix(in srgb, var(--border) 80%, transparent);
-}
-
-/* Invisible body still paints layout; hide checkbox hit targets under the float. */
-.repo-card.is-drag-slot .invisible {
-  pointer-events: none;
+  border-color: var(--primary);
+  /* Disable opacity/border transitions while dragging so drop does not fade. */
+  transition: none;
 }
 
 .repo-grid > .repo-card {
@@ -349,13 +311,15 @@ html[data-platform="mac"] .app-toolbar {
   align-items: center;
   justify-content: center;
   border-radius: calc(var(--radius-lg) * 0.6);
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border: 1px solid var(--border);
+  background: var(--muted);
   color: var(--primary);
   flex-shrink: 0;
+  transition: transform var(--motion-duration-panel) var(--motion-ease-out);
 }
 
-.repo-card.is-selected .repo-card-icon {
-  background: color-mix(in srgb, var(--primary) 22%, transparent);
+.repo-card:not(.is-dragging):hover .repo-card-icon {
+  transform: scale(1.05);
 }
 
 .app-banners {
@@ -398,19 +362,14 @@ html[data-platform="mac"] .app-toolbar {
   background: color-mix(in srgb, var(--muted) 35%, var(--card));
   box-shadow: var(--shadow-control);
   transition:
-    color var(--motion-duration-color) var(--motion-ease-out-soft),
-    background-color var(--motion-duration-color) var(--motion-ease-out-soft),
-    border-color var(--motion-duration-color) var(--motion-ease-out-soft),
-    transform var(--motion-duration-press) var(--motion-ease-out);
+    color var(--motion-duration-color) var(--motion-ease-out),
+    background-color var(--motion-duration-color) var(--motion-ease-out),
+    border-color var(--motion-duration-color) var(--motion-ease-out);
 }
 
 .settings-row:hover:not(:disabled) {
   background: var(--repo-hover);
   border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
-}
-
-.settings-row:active:not(:disabled) {
-  transform: scale(var(--motion-card-press-scale));
 }
 
 /* Grouped preference lists — macOS Settings–style inset rows */
@@ -420,8 +379,7 @@ html[data-platform="mac"] .app-toolbar {
 
 .settings-group-row {
   background: transparent;
-  transition: background-color var(--motion-duration-color)
-    var(--motion-ease-out-soft);
+  transition: background-color var(--motion-duration-color) var(--motion-ease-out);
 }
 
 .settings-group-row--action:hover:not(:disabled),
@@ -437,18 +395,10 @@ html[data-platform="mac"] .app-toolbar {
   outline: none;
 }
 
-/* Settings body — scroll without a visible scrollbar */
+/* Settings body — scroll without a visible scrollbar (global hide above) */
 .settings-body {
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.settings-body::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
 }
 
 [data-slot="dialog-content"].giter-dialog {
@@ -466,28 +416,28 @@ html[data-platform="mac"] .app-toolbar {
   background: rgba(0, 0, 0, 0.52);
 }
 
-/* Dialog surface tokens — enter/exit motion owned by framer-motion. */
-[data-slot="dialog-content"].giter-dialog {
-  will-change: transform, opacity;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .mac-segment [data-slot="toggle-group-item"],
-  .mac-segment .mac-segment-item,
-  .mac-segment [data-slot="toggle-group-item"]:active {
+  .mac-segment .mac-segment-item {
     transition: none !important;
-    transform: none !important;
   }
 
   .repo-card,
-  .repo-card.is-drag-slot,
-  .repo-grid.is-reordering .repo-card {
+  .repo-card.is-dragging,
+  .repo-grid.is-reordering .repo-card,
+  .repo-card-icon {
     transition: none !important;
+  }
+
+  .repo-card:not(.is-dragging):hover .repo-card-icon {
+    transform: none !important;
   }
 
   /* tw-animate enter/exit + indefinite spinners */
   .animate-in,
   .animate-out,
+  [data-slot="dialog-overlay"],
+  [data-slot="dialog-content"],
   [data-slot="popover-content"],
   [data-slot="dropdown-menu-content"],
   [data-slot="dropdown-menu-sub-content"] {
@@ -510,46 +460,16 @@ html[data-platform="mac"] .app-toolbar {
   }
 }
 
-/* Thin overlay scrollbar — macOS-adjacent */
+/* Scroll container marker (used by RepoGrid); scrollbar is globally hidden */
 .giter-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--foreground) 22%, transparent)
-    transparent;
+  overflow-x: hidden;
 }
 
-.giter-scroll::-webkit-scrollbar {
-  width: 11px;
-  height: 11px;
-}
-
-.giter-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.giter-scroll::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--foreground) 18%, transparent);
-  border-radius: 999px;
-  border: 3px solid transparent;
-  background-clip: content-box;
-}
-
-.giter-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(in srgb, var(--foreground) 32%, transparent);
-}
-
-.giter-scroll::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.dark .giter-scroll {
-  scrollbar-color: color-mix(in srgb, var(--foreground) 28%, transparent)
-    transparent;
-}
-
-.dark .giter-scroll::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--foreground) 24%, transparent);
-}
-
-.dark .giter-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(in srgb, var(--foreground) 40%, transparent);
+@layer utilities {
+  .scroll-overlay {
+    scrollbar-gutter: stable both-edges;
+    padding-right: 0.5rem;
+    margin-right: -0.5rem;
+    overflow-x: hidden;
+  }
 }

@@ -10,7 +10,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { FM_TRANSITION, MOTION_SCALE } from "@/lib/motion"
+import { fadePage } from "@/lib/motion"
 import { XIcon } from "lucide-react"
 
 type DialogMotionContextValue = {
@@ -86,18 +86,11 @@ function DialogOverlay({
     <MotionOverlay
       data-slot="dialog-overlay"
       forceMount
-      className={cn("fixed inset-0 isolate z-50", className)}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={
-        reduceMotion
-          ? { duration: 0 }
-          : {
-              duration: FM_TRANSITION.overlay.duration,
-              ease: FM_TRANSITION.overlay.ease,
-            }
-      }
+      className={cn("fixed inset-0 isolate z-[80]", className)}
+      initial={fadePage.initial}
+      animate={fadePage.animate}
+      exit={fadePage.exit}
+      transition={reduceMotion ? { duration: 0 } : fadePage.transition}
       {...props}
     />
   )
@@ -116,42 +109,28 @@ function DialogContent({
 }) {
   const open = useDialogOpen()
   const reduceMotion = useReducedMotion()
+  const transition = reduceMotion ? { duration: 0 } : fadePage.transition
 
   return (
     <DialogPortal forceMount>
       <AnimatePresence>
-        {open ? <DialogOverlay key="giter-dialog-overlay" /> : null}
+        {open ? <DialogOverlay key="dialog-overlay" /> : null}
       </AnimatePresence>
       <AnimatePresence>
         {open ? (
           <MotionContent
-            key="giter-dialog-content"
+            key="dialog-content"
             data-slot="dialog-content"
             forceMount
             className={cn(
-              "giter-dialog fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-[var(--radius-lg)] p-4 text-sm outline-none sm:max-w-sm",
+              "giter-dialog fixed top-1/2 left-1/2 z-[80] grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-[var(--radius-lg)] p-4 text-sm outline-none sm:max-w-sm sm:rounded-lg",
               className,
             )}
             style={{ x: "-50%", y: "-50%" }}
-            initial={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, scale: MOTION_SCALE.dialogFrom }
-            }
-            animate={{ opacity: 1, scale: 1 }}
-            exit={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, scale: MOTION_SCALE.dialogFrom }
-            }
-            transition={
-              reduceMotion
-                ? { duration: 0 }
-                : {
-                    duration: FM_TRANSITION.dialog.duration,
-                    ease: FM_TRANSITION.dialog.ease,
-                  }
-            }
+            initial={fadePage.initial}
+            animate={fadePage.animate}
+            exit={fadePage.exit}
+            transition={transition}
             {...(props as Record<string, unknown>)}
           >
             {children}

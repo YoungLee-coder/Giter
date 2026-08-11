@@ -113,11 +113,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version: lts/*
-          cache: npm
+          cache: pnpm
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -130,7 +135,7 @@ jobs:
           workspaces: ./src-tauri -> target
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build and upload release assets
         uses: tauri-apps/tauri-action@v1

@@ -1,5 +1,5 @@
 import type { BatchProgress } from "@/lib/tauri";
-import { useAppStore } from "@/stores/appStore";
+import { writeProgress } from "@/lib/progressWriter";
 
 let pending: Record<string, BatchProgress> = {};
 let rafId = 0;
@@ -9,10 +9,10 @@ function flush() {
   const patch = pending;
   pending = {};
   if (Object.keys(patch).length === 0) return;
-  useAppStore.getState().setProgress((prev) => ({ ...prev, ...patch }));
+  writeProgress((prev) => ({ ...prev, ...patch }));
 }
 
-/** Coalesce high-frequency batch-progress events to one store write per frame. */
+/** Coalesce high-frequency batch-progress events to one write per frame. */
 export function queueProgress(p: BatchProgress) {
   pending[p.path] = p;
   if (rafId) return;

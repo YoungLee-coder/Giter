@@ -1,8 +1,8 @@
 import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useI18n } from "@/i18n";
+import { useI18n } from "@/hooks/useI18n";
+import { useThemeSetting } from "@/hooks/useSettings";
 import type { ThemePreference } from "@/lib/tauri";
-import { useThemeSetting } from "@/stores/settingsStore";
 
 const OPTIONS: {
   value: ThemePreference;

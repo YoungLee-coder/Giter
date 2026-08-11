@@ -1,6 +1,13 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { AlertCircleIcon, CircleAlertIcon, InfoIcon, SettingsIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  ArrowUpCircleIcon,
+  CircleAlertIcon,
+  InfoIcon,
+  SettingsIcon,
+} from "lucide-react";
+import { toast } from "sonner";
 import { BatchBar, RepoGrid } from "@/components/repo";
 import { RepoDetailModal } from "@/components/RepoDetailModal";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -13,29 +20,51 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
-import { useI18n } from "@/i18n";
+import { useAppUi } from "@/hooks/AppUiProvider";
+import { useI18n } from "@/hooks/useI18n";
+import {
+  useGitOkQuery,
+  useReorderReposMutation,
+  useRepoActions,
+  useReposQuery,
+} from "@/hooks/useRepos";
+import { useSettings } from "@/hooks/useSettings";
+import { APP_NAME } from "@/lib/app";
 import { queueProgress } from "@/lib/progressBus";
+import {
+  DRAG_REGION_ATTR,
+  DRAG_REGION_STYLE,
+  getDragBarHeight,
+} from "@/lib/platform";
 import { api, type BatchProgress } from "@/lib/tauri";
 import {
   checkForAppUpdate,
+  dismissUpdateVersion,
+  downloadAndInstallUpdate,
+  formatUpdateError,
   getDismissedUpdateVersion,
   markUpdateChecked,
+  relaunchApp,
   shouldAutoCheckForUpdate,
 } from "@/lib/updater";
 import { cn } from "@/lib/utils";
-import { useAppStore } from "@/stores/appStore";
 import "./App.css";
 
 const SettingsModal = lazy(() =>
   import("@/components/SettingsModal").then((m) => ({ default: m.SettingsModal })),
 );
 
+const DEFAULT_DRAG_BAR_HEIGHT = getDragBarHeight();
+const HEADER_HEIGHT = 48;
+
 function App() {
-  const isMac = useAppStore((s) => s.isMac);
-  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
-  const setAvailableUpdate = useAppStore((s) => s.setAvailableUpdate);
-  const load = useAppStore((s) => s.load);
+  const { isMac, setSettingsOpen, setAvailableUpdate } = useAppUi();
+  const dragBarHeight = DEFAULT_DRAG_BAR_HEIGHT;
+  const contentTopOffset = dragBarHeight + HEADER_HEIGHT;
   const { t, locale } = useI18n();
+  useSettings();
+  useReposQuery();
+  useGitOkQuery();
 
   useEffect(() => {
     document.documentElement.dataset.platform = isMac ? "mac" : "other";
@@ -60,10 +89,6 @@ function App() {
       unlisten?.();
     };
   }, [isMac, setSettingsOpen]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   useEffect(() => {
     if (!shouldAutoCheckForUpdate()) return;
@@ -99,8 +124,24 @@ function App() {
   }, []);
 
   return (
-    <div className="flex h-svh flex-col bg-background text-foreground">
-      <AppToolbar />
+    <div
+      className="flex h-svh flex-col overflow-hidden bg-background text-foreground"
+      style={{ paddingTop: contentTopOffset }}
+    >
+      {dragBarHeight > 0 && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[70] bg-background/80 backdrop-blur-md"
+          data-tauri-drag-region
+          style={
+            {
+              WebkitAppRegion: "drag",
+              height: dragBarHeight,
+            } as CSSProperties
+          }
+          aria-hidden="true"
+        />
+      )}
+      <AppHeader dragBarHeight={dragBarHeight} />
       <AppBanners />
       <AppMain />
       <AppModals />
@@ -108,102 +149,197 @@ function App() {
   );
 }
 
-function AppToolbar() {
+function AppHeader({ dragBarHeight }: { dragBarHeight: number }) {
   const { t } = useI18n();
-  const repos = useAppStore((s) => s.repos);
-  const selected = useAppStore((s) => s.selected);
-  const busy = useAppStore((s) => s.busy);
-  const refreshing = useAppStore((s) => s.refreshing);
-  const gitOk = useAppStore((s) => s.gitOk);
-  const isMac = useAppStore((s) => s.isMac);
-  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
-  const onAdd = useAppStore((s) => s.onAdd);
-  const onScan = useAppStore((s) => s.onScan);
-  const onRefresh = useAppStore((s) => s.onRefresh);
-  const onRemoveSelected = useAppStore((s) => s.onRemoveSelected);
-  const runBatch = useAppStore((s) => s.runBatch);
+  const {
+    selected,
+    busy,
+    refreshing,
+    availableUpdate,
+    updateInstalling,
+    setSettingsOpen,
+    setBusy,
+    setRefreshing,
+    setSelected,
+    clearProgress,
+    setError,
+    setNotice,
+    setUpdateInstalling,
+    setUpdateProgress,
+    selectAll,
+    clearSelection,
+  } = useAppUi();
+  const { data: repos = [] } = useReposQuery();
+  const { data: gitOk = null } = useGitOkQuery();
+  const { settings } = useSettings();
+  const { onAdd, onScan, onRefresh, onRemoveSelected, runBatch } = useRepoActions({
+    scanDepth: settings.scanDepth,
+    selected,
+    setSelected,
+    setBusy,
+    setRefreshing,
+    clearProgress,
+    onNotice: setNotice,
+    onError: setError,
+  });
 
   const gitStatusLabel =
-    gitOk === null
-      ? t("gitChecking")
-      : gitOk
-        ? t("gitReady")
-        : t("gitMissing");
+    gitOk === null ? t("gitChecking") : gitOk ? t("gitReady") : t("gitMissing");
+  const allSelected = repos.length > 0 && selected.size === repos.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const installAvailableUpdate = async () => {
+    if (!availableUpdate || updateInstalling) return;
+    setUpdateInstalling(true);
+    setUpdateProgress(0);
+    setError(null);
+    try {
+      await downloadAndInstallUpdate(
+        availableUpdate,
+        ({ downloaded, contentLength }) => {
+          const percent =
+            contentLength && contentLength > 0
+              ? Math.min(100, Math.round((downloaded / contentLength) * 100))
+              : 0;
+          setUpdateProgress(percent);
+        },
+      );
+      setUpdateProgress(null);
+      await relaunchApp();
+    } catch (e) {
+      setUpdateInstalling(false);
+      setUpdateProgress(null);
+      const message = t("updateFailed", { error: formatUpdateError(e) });
+      setError(message);
+      toast.error(message);
+    }
+  };
 
   return (
     <header
-      className="app-toolbar flex h-12 shrink-0 items-stretch gap-3 border-b px-3"
-      data-tauri-drag-region
+      className="app-header fixed z-50 w-full bg-background/80 backdrop-blur-md transition-all duration-300"
+      {...DRAG_REGION_ATTR}
+      style={
+        {
+          ...DRAG_REGION_STYLE,
+          top: dragBarHeight,
+          height: HEADER_HEIGHT,
+        } as CSSProperties
+      }
     >
-      <div className="flex min-w-0 flex-1 items-stretch" data-tauri-drag-region>
-        <BatchBar
-          busy={busy || gitOk === false}
-          refreshing={refreshing}
-          selectedCount={selected.size}
-          totalCount={repos.length}
-          onAdd={() => void onAdd()}
-          onScan={() => void onScan()}
-          onRefresh={() => void onRefresh()}
-          onFetch={() => void runBatch("fetch")}
-          onUpdate={() => void runBatch("update")}
-          onRemoveSelected={() => void onRemoveSelected()}
-        />
-      </div>
-      <div className="flex items-center gap-1">
-        <Popover>
-          <PopoverTrigger asChild>
+      <div
+        className="flex h-full items-center justify-between gap-2 px-6"
+        {...DRAG_REGION_ATTR}
+        style={DRAG_REGION_STYLE as CSSProperties}
+      >
+        <div
+          className="flex items-center gap-1"
+          style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-semibold text-primary">{APP_NAME}</span>
             <Button
               type="button"
               variant="ghost"
-              size="icon-sm"
-              aria-label={gitStatusLabel}
-              className="relative"
+              size="icon"
+              aria-label={t("settings")}
+              title={t("settings")}
+              className="hover:bg-black/5 dark:hover:bg-white/5"
+              onClick={() => setSettingsOpen(true)}
             >
-              <span
-                className={cn(
-                  "size-2.5 rounded-full",
-                  gitOk === null && "bg-muted-foreground/40",
-                  gitOk === true && "bg-[var(--ok)]",
-                  gitOk === false && "bg-destructive",
-                )}
-                aria-hidden="true"
-              />
+              <SettingsIcon className="size-4" />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-64">
-            <PopoverHeader>
-              <PopoverTitle className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    "size-2.5 rounded-full",
-                    gitOk === null && "bg-muted-foreground/40",
-                    gitOk === true && "bg-[var(--ok)]",
-                    gitOk === false && "bg-destructive",
-                  )}
-                  aria-hidden="true"
-                />
-                {gitStatusLabel}
-              </PopoverTitle>
-            </PopoverHeader>
-            {gitOk === false && (
-              <p className="text-sm text-muted-foreground">
-                {t("gitMissingBanner")}
-              </p>
+            {availableUpdate && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={updateInstalling}
+                aria-label={t("updateAvailableBanner", {
+                  version: availableUpdate.version,
+                })}
+                title={t("updateAvailableBanner", {
+                  version: availableUpdate.version,
+                })}
+                className="text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-500/10"
+                onClick={() => void installAvailableUpdate()}
+              >
+                <ArrowUpCircleIcon className="size-5" />
+              </Button>
             )}
-          </PopoverContent>
-        </Popover>
-        {!isMac && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t("settings")}
-            title={t("settings")}
-            onClick={() => setSettingsOpen(true)}
-          >
-            <SettingsIcon />
-          </Button>
-        )}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={gitStatusLabel}
+                  title={gitStatusLabel}
+                  className="hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  <span
+                    className={cn(
+                      "size-2.5 rounded-full",
+                      gitOk === null && "bg-muted-foreground/40",
+                      gitOk === true && "bg-[var(--ok)]",
+                      gitOk === false && "bg-destructive",
+                    )}
+                    aria-hidden="true"
+                  />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-64">
+                <PopoverHeader>
+                  <PopoverTitle className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "size-2.5 rounded-full",
+                        gitOk === null && "bg-muted-foreground/40",
+                        gitOk === true && "bg-[var(--ok)]",
+                        gitOk === false && "bg-destructive",
+                      )}
+                      aria-hidden="true"
+                    />
+                    {gitStatusLabel}
+                  </PopoverTitle>
+                </PopoverHeader>
+                {gitOk === false && (
+                  <p className="text-sm text-muted-foreground">{t("gitMissingBanner")}</p>
+                )}
+              </PopoverContent>
+            </Popover>
+            {selected.size > 0 && (
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {t("selectedCount", {
+                  selected: selected.size,
+                  total: repos.length,
+                })}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div
+          className="flex min-w-0 flex-1 items-center justify-end gap-1.5"
+          style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
+        >
+          <BatchBar
+            busy={busy || gitOk === false}
+            refreshing={refreshing}
+            selectedCount={selected.size}
+            totalCount={repos.length}
+            allSelected={allSelected}
+            someSelected={someSelected}
+            onSelectAll={() => selectAll(repos.map((r) => r.path))}
+            onClearSelection={clearSelection}
+            onAdd={() => void onAdd()}
+            onScan={() => void onScan()}
+            onRefresh={() => void onRefresh()}
+            onFetch={() => void runBatch("fetch")}
+            onUpdate={() => void runBatch("update")}
+            onRemoveSelected={() => void onRemoveSelected()}
+          />
+        </div>
       </div>
     </header>
   );
@@ -211,16 +347,53 @@ function AppToolbar() {
 
 function AppBanners() {
   const { t } = useI18n();
-  const error = useAppStore((s) => s.error);
-  const notice = useAppStore((s) => s.notice);
-  const gitOk = useAppStore((s) => s.gitOk);
-  const availableUpdate = useAppStore((s) => s.availableUpdate);
-  const updateInstalling = useAppStore((s) => s.updateInstalling);
-  const updateProgress = useAppStore((s) => s.updateProgress);
-  const installAvailableUpdate = useAppStore((s) => s.installAvailableUpdate);
-  const dismissAvailableUpdate = useAppStore((s) => s.dismissAvailableUpdate);
+  const {
+    error,
+    availableUpdate,
+    updateInstalling,
+    updateProgress,
+    setAvailableUpdate,
+    setUpdateInstalling,
+    setUpdateProgress,
+    setError,
+  } = useAppUi();
+  const { data: gitOk = null } = useGitOkQuery();
 
-  if (!(error || notice || gitOk === false || availableUpdate)) return null;
+  const installAvailableUpdate = async () => {
+    if (!availableUpdate || updateInstalling) return;
+    setUpdateInstalling(true);
+    setUpdateProgress(0);
+    setError(null);
+    try {
+      await downloadAndInstallUpdate(
+        availableUpdate,
+        ({ downloaded, contentLength }) => {
+          const percent =
+            contentLength && contentLength > 0
+              ? Math.min(100, Math.round((downloaded / contentLength) * 100))
+              : 0;
+          setUpdateProgress(percent);
+        },
+      );
+      setUpdateProgress(null);
+      await relaunchApp();
+    } catch (e) {
+      setUpdateInstalling(false);
+      setUpdateProgress(null);
+      const message = t("updateFailed", { error: formatUpdateError(e) });
+      setError(message);
+      toast.error(message);
+    }
+  };
+
+  const dismissAvailableUpdate = () => {
+    if (availableUpdate) {
+      dismissUpdateVersion(availableUpdate.version);
+    }
+    setAvailableUpdate(null);
+  };
+
+  if (!(error || gitOk === false || availableUpdate)) return null;
 
   return (
     <div className="app-banners flex flex-col">
@@ -228,12 +401,6 @@ function AppBanners() {
         <Alert variant="destructive">
           <AlertCircleIcon />
           <AlertTitle>{error}</AlertTitle>
-        </Alert>
-      )}
-      {notice && (
-        <Alert>
-          <InfoIcon />
-          <AlertDescription>{notice}</AlertDescription>
         </Alert>
       )}
       {gitOk === false && (
@@ -261,19 +428,10 @@ function AppBanners() {
           )}
           {!updateInstalling && (
             <AlertAction className="static top-auto right-auto col-start-2 mt-2 flex justify-end gap-2">
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => void installAvailableUpdate()}
-              >
+              <Button type="button" size="sm" onClick={() => void installAvailableUpdate()}>
                 {t("downloadAndInstall")}
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={dismissAvailableUpdate}
-              >
+              <Button type="button" size="sm" variant="ghost" onClick={dismissAvailableUpdate}>
                 {t("updateLater")}
               </Button>
             </AlertAction>
@@ -285,13 +443,9 @@ function AppBanners() {
 }
 
 function AppMain() {
-  const repos = useAppStore((s) => s.repos);
-  const selected = useAppStore((s) => s.selected);
-  const toggle = useAppStore((s) => s.toggle);
-  const selectAll = useAppStore((s) => s.selectAll);
-  const clearSelection = useAppStore((s) => s.clearSelection);
-  const setDetailRepo = useAppStore((s) => s.setDetailRepo);
-  const onReorder = useAppStore((s) => s.onReorder);
+  const { selected, toggle, setDetailRepo } = useAppUi();
+  const { data: repos = [] } = useReposQuery();
+  const reorderMutation = useReorderReposMutation();
 
   return (
     <main className="giter-scroll min-h-0 flex-1 overflow-auto bg-background p-2.5">
@@ -299,34 +453,38 @@ function AppMain() {
         repos={repos}
         selected={selected}
         onToggle={toggle}
-        onSelectAll={selectAll}
-        onClearSelection={clearSelection}
         onOpenDetail={setDetailRepo}
-        onReorder={onReorder}
+        onReorder={(paths) => {
+          // Sync mutate so onMutate/setQueryData runs before drag teardown paint.
+          reorderMutation.mutate(paths);
+        }}
       />
     </main>
   );
 }
 
 function AppModals() {
-  const settingsOpen = useAppStore((s) => s.settingsOpen);
-  const detailRepo = useAppStore((s) => s.detailRepo);
-  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
-  const setDetailRepo = useAppStore((s) => s.setDetailRepo);
+  const { settingsOpen, detailRepo, setSettingsOpen, setDetailRepo } = useAppUi();
+  const [settingsMounted, setSettingsMounted] = useState(false);
+
+  useEffect(() => {
+    if (settingsOpen) setSettingsMounted(true);
+  }, [settingsOpen]);
 
   return (
     <>
-      {settingsOpen && (
+      {settingsMounted ? (
         <Suspense fallback={null}>
-          <SettingsModal open onClose={() => setSettingsOpen(false)} />
+          <SettingsModal
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
         </Suspense>
-      )}
-      {detailRepo && (
-        <RepoDetailModal
-          repo={detailRepo}
-          onClose={() => setDetailRepo(null)}
-        />
-      )}
+      ) : null}
+      <RepoDetailModal
+        repo={detailRepo}
+        onClose={() => setDetailRepo(null)}
+      />
     </>
   );
 }

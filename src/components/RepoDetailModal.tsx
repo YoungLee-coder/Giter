@@ -1,4 +1,14 @@
-import { useEffect, useId, useMemo, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,63 +18,188 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { useI18n } from "@/i18n";
-import type { RepoStatus } from "@/lib/tauri";
-import { useRepoDetailStore } from "@/stores/repoDetailStore";
+import { useI18n } from "@/hooks/useI18n";
+import { queryKeys } from "@/lib/query/keys";
+import {
+  api,
+  type GithubPublishInfo,
+  type RepoDetail,
+  type RepoStatus,
+} from "@/lib/tauri";
+
+type RemoteMode = "idle" | "publish" | "addUrl";
 
 type Props = {
   repo: RepoStatus | null;
   onClose: () => void;
 };
 
+const initialRemote = {
+  remoteMode: "idle" as RemoteMode,
+  publishName: "",
+  publishInfo: null as GithubPublishInfo | null,
+  publishInfoLoading: false,
+  publishing: false,
+  remoteName: "origin",
+  remoteUrl: "",
+  savingRemote: false,
+};
+
 export function RepoDetailModal({ repo, onClose }: Props) {
   const { t, locale } = useI18n();
-  const detail = useRepoDetailStore((s) => s.detail);
-  const loading = useRepoDetailStore((s) => s.loading);
-  const error = useRepoDetailStore((s) => s.error);
-  const remoteMode = useRepoDetailStore((s) => s.remoteMode);
-  const publishName = useRepoDetailStore((s) => s.publishName);
-  const publishInfo = useRepoDetailStore((s) => s.publishInfo);
-  const publishInfoLoading = useRepoDetailStore((s) => s.publishInfoLoading);
-  const publishing = useRepoDetailStore((s) => s.publishing);
-  const remoteName = useRepoDetailStore((s) => s.remoteName);
-  const remoteUrl = useRepoDetailStore((s) => s.remoteUrl);
-  const savingRemote = useRepoDetailStore((s) => s.savingRemote);
-  const setError = useRepoDetailStore((s) => s.setError);
-  const setRemoteMode = useRepoDetailStore((s) => s.setRemoteMode);
-  const setPublishName = useRepoDetailStore((s) => s.setPublishName);
-  const setRemoteName = useRepoDetailStore((s) => s.setRemoteName);
-  const setRemoteUrl = useRepoDetailStore((s) => s.setRemoteUrl);
-  const reset = useRepoDetailStore((s) => s.reset);
-  const resetRemoteForm = useRepoDetailStore((s) => s.resetRemoteForm);
-  const openRepo = useRepoDetailStore((s) => s.openRepo);
-  const loadPublishInfo = useRepoDetailStore((s) => s.loadPublishInfo);
-  const reveal = useRepoDetailStore((s) => s.reveal);
-  const publish = useRepoDetailStore((s) => s.publish);
-  const addRemote = useRepoDetailStore((s) => s.addRemote);
+  const queryClient = useQueryClient();
+  const [detail, setDetail] = useState<RepoDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [remoteMode, setRemoteMode] = useState<RemoteMode>(initialRemote.remoteMode);
+  const [publishName, setPublishName] = useState(initialRemote.publishName);
+  const [publishInfo, setPublishInfo] = useState<GithubPublishInfo | null>(
+    initialRemote.publishInfo,
+  );
+  const [publishInfoLoading, setPublishInfoLoading] = useState(
+    initialRemote.publishInfoLoading,
+  );
+  const [publishing, setPublishing] = useState(initialRemote.publishing);
+  const [remoteName, setRemoteName] = useState(initialRemote.remoteName);
+  const [remoteUrl, setRemoteUrl] = useState(initialRemote.remoteUrl);
+  const [savingRemote, setSavingRemote] = useState(initialRemote.savingRemote);
+  const detailLoadSeq = useRef(0);
+  const publishInfoSeq = useRef(0);
+  const publishNameRef = useRef(publishName);
+  const publishingRef = useRef(publishing);
+  const remoteNameRef = useRef(remoteName);
+  const remoteUrlRef = useRef(remoteUrl);
+  const savingRemoteRef = useRef(savingRemote);
+  publishNameRef.current = publishName;
+  publishingRef.current = publishing;
+  remoteNameRef.current = remoteName;
+  remoteUrlRef.current = remoteUrl;
+  savingRemoteRef.current = savingRemote;
   const publishNameId = useId();
   const remoteNameId = useId();
   const remoteUrlId = useId();
 
+  const syncRepoStatus = (status: RepoStatus) => {
+    queryClient.setQueryData<RepoStatus[]>(queryKeys.repos, (prev) =>
+      prev?.map((r) => (r.path === status.path ? status : r)),
+    );
+  };
+
+  const applyInitialRemote = (repoName = "") => {
+    setRemoteMode(initialRemote.remoteMode);
+    setPublishName(repoName);
+    setPublishInfo(initialRemote.publishInfo);
+    setPublishInfoLoading(initialRemote.publishInfoLoading);
+    setPublishing(initialRemote.publishing);
+    setRemoteName(initialRemote.remoteName);
+    setRemoteUrl(initialRemote.remoteUrl);
+    setSavingRemote(initialRemote.savingRemote);
+  };
+
+  const resetRemoteForm = (repoName?: string) => {
+    applyInitialRemote(repoName ?? "");
+  };
+
+  const openRepo = async (next: RepoStatus) => {
+    const seq = ++detailLoadSeq.current;
+    setLoading(true);
+    setError(null);
+    setDetail(null);
+    applyInitialRemote(next.name);
+    try {
+      const result = await api.repoDetail(next.path);
+      if (seq !== detailLoadSeq.current) return;
+      // Hydrate detail without delaying first paint.
+      if (seq !== detailLoadSeq.current) return;
+      setDetail(result);
+      setLoading(false);
+    } catch (e) {
+      if (seq !== detailLoadSeq.current) return;
+      setError(String(e));
+      setLoading(false);
+    }
+  };
+
+  const loadPublishInfo = async () => {
+    const seq = ++publishInfoSeq.current;
+    setPublishInfoLoading(true);
+    try {
+      const info = await api.githubPublishInfo();
+      if (seq !== publishInfoSeq.current) return;
+      setPublishInfo(info);
+    } catch (e) {
+      if (seq !== publishInfoSeq.current) return;
+      setPublishInfo({ available: false, login: null });
+      setError(String(e));
+    } finally {
+      if (seq === publishInfoSeq.current) setPublishInfoLoading(false);
+    }
+  };
+
+  const reveal = async (path: string) => {
+    try {
+      await revealItemInDir(path);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const publish = async (path: string, privateRepo: boolean) => {
+    const name = publishNameRef.current.trim();
+    if (!name || publishingRef.current) return;
+
+    setPublishing(true);
+    setError(null);
+    try {
+      const result = await api.publishToGithub(path, name, privateRepo);
+      setDetail(result);
+      syncRepoStatus(result.status);
+      resetRemoteForm();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const addRemote = async (path: string) => {
+    const name = remoteNameRef.current.trim();
+    const url = remoteUrlRef.current.trim();
+    if (!name || !url || savingRemoteRef.current) return;
+
+    setSavingRemote(true);
+    setError(null);
+    try {
+      const result = await api.addRemote(path, name, url);
+      setDetail(result);
+      syncRepoStatus(result.status);
+      resetRemoteForm();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSavingRemote(false);
+    }
+  };
+
   useEffect(() => {
     if (!repo) {
-      reset();
+      // Cancel in-flight loads; keep displayRepo content for exit animation.
+      detailLoadSeq.current += 1;
+      publishInfoSeq.current += 1;
       return;
     }
     void openRepo(repo);
-  }, [repo, openRepo, reset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open when repo identity changes
+  }, [repo]);
 
   useEffect(() => {
     if (remoteMode !== "publish" || !repo) return;
     void loadPublishInfo();
-  }, [remoteMode, repo, loadPublishInfo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load when entering publish mode
+  }, [remoteMode, repo]);
 
   const dateFmt = useMemo(
     () =>
@@ -75,9 +210,16 @@ export function RepoDetailModal({ repo, onClose }: Props) {
     [locale],
   );
 
-  if (!repo) return null;
+  // Keep last repo while Dialog exit animation plays (cc-switch / Radix pattern).
+  const [displayRepo, setDisplayRepo] = useState<RepoStatus | null>(repo);
+  useEffect(() => {
+    if (repo) setDisplayRepo(repo);
+  }, [repo]);
 
-  const status = detail?.status ?? repo;
+  if (!displayRepo) return null;
+
+  const status = detail?.status ?? displayRepo;
+  const activeRepo = displayRepo;
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -86,7 +228,7 @@ export function RepoDetailModal({ repo, onClose }: Props) {
 
   const onAddRemote = async (event: FormEvent) => {
     event.preventDefault();
-    await addRemote(repo.path);
+    await addRemote(activeRepo.path);
   };
 
   const publishPreview = () => {
@@ -130,18 +272,12 @@ export function RepoDetailModal({ repo, onClose }: Props) {
           )}
 
           {!publishInfoLoading && publishInfo && !publishInfo.available && (
-            <p className="text-sm text-muted-foreground">
-              {t("detailPublishGhMissing")}
-            </p>
+            <p className="text-sm text-muted-foreground">{t("detailPublishGhMissing")}</p>
           )}
 
-          {!publishInfoLoading &&
-            publishInfo?.available &&
-            !publishInfo.login && (
-              <p className="text-sm text-muted-foreground">
-                {t("detailPublishGhAuth")}
-              </p>
-            )}
+          {!publishInfoLoading && publishInfo?.available && !publishInfo.login && (
+            <p className="text-sm text-muted-foreground">{t("detailPublishGhAuth")}</p>
+          )}
 
           {!publishInfoLoading && publishInfo?.available && publishInfo.login && (
             <>
@@ -167,7 +303,7 @@ export function RepoDetailModal({ repo, onClose }: Props) {
                   variant="outline"
                   className="h-auto flex-col items-start gap-1 px-3 py-3"
                   disabled={!canPublish}
-                  onClick={() => void publish(repo.path, false)}
+                  onClick={() => void publish(activeRepo.path, false)}
                 >
                   <span className="font-mono text-sm">{publishPreview()}</span>
                   <span className="text-xs text-muted-foreground">
@@ -179,7 +315,7 @@ export function RepoDetailModal({ repo, onClose }: Props) {
                   variant="outline"
                   className="h-auto flex-col items-start gap-1 px-3 py-3"
                   disabled={!canPublish}
-                  onClick={() => void publish(repo.path, true)}
+                  onClick={() => void publish(activeRepo.path, true)}
                 >
                   <span className="font-mono text-sm">{publishPreview()}</span>
                   <span className="text-xs text-muted-foreground">
@@ -202,7 +338,7 @@ export function RepoDetailModal({ repo, onClose }: Props) {
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => resetRemoteForm(repo.name)}
+              onClick={() => resetRemoteForm(activeRepo.name)}
               disabled={publishing}
             >
               {t("detailRemoteCancel")}
@@ -261,7 +397,7 @@ export function RepoDetailModal({ repo, onClose }: Props) {
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => resetRemoteForm(repo.name)}
+              onClick={() => resetRemoteForm(activeRepo.name)}
               disabled={savingRemote}
             >
               {t("detailRemoteCancel")}
@@ -322,7 +458,7 @@ export function RepoDetailModal({ repo, onClose }: Props) {
         onEscapeKeyDown={(event) => {
           if (remoteMode !== "idle") {
             event.preventDefault();
-            resetRemoteForm(repo.name);
+            resetRemoteForm(activeRepo.name);
           }
         }}
       >
@@ -341,7 +477,7 @@ export function RepoDetailModal({ repo, onClose }: Props) {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => void reveal(repo.path)}
+              onClick={() => void reveal(activeRepo.path)}
             >
               {t("detailReveal")}
             </Button>
@@ -431,7 +567,10 @@ export function RepoDetailModal({ repo, onClose }: Props) {
                   ) : (
                     <ul className="soft-panel flex min-w-0 flex-col divide-y divide-border/80">
                       {detail?.commits.map((commit) => (
-                        <li key={commit.hash} className="flex min-w-0 flex-col gap-1 px-3 py-2.5">
+                        <li
+                          key={commit.hash}
+                          className="flex min-w-0 flex-col gap-1 px-3 py-2.5"
+                        >
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-mono text-xs text-muted-foreground">
                               {commit.shortHash}
@@ -455,13 +594,7 @@ export function RepoDetailModal({ repo, onClose }: Props) {
   );
 }
 
-function DetailField({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function DetailField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="soft-panel flex min-w-0 flex-col gap-1 px-3 py-2.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>

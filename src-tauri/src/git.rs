@@ -13,6 +13,9 @@ pub struct RepoStatus {
     pub behind: u32,
     pub dirty: bool,
     pub last_error: Option<String>,
+    /// Detected remote host provider: github, gitlab, bitbucket, gitea, codeberg, azure, other.
+    /// `None` when the repo has no remotes configured.
+    pub remote_provider: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -205,11 +208,14 @@ pub fn status(path: &str) -> RepoStatus {
             behind: 0,
             dirty: false,
             last_error: Some("Not a git repository".into()),
+            remote_provider: None,
         };
     }
 
+    let remote_provider = detect_remote_provider(path);
+
     match run_git(path, &["status", "--porcelain=v2", "--branch"]) {
-        Ok(out) => parse_status(path, &name, &out),
+        Ok(out) => parse_status(path, &name, &out, remote_provider),
         Err(err) => RepoStatus {
             path: path.to_string(),
             name,
@@ -219,11 +225,17 @@ pub fn status(path: &str) -> RepoStatus {
             behind: 0,
             dirty: false,
             last_error: Some(err),
+            remote_provider,
         },
     }
 }
 
-fn parse_status(path: &str, name: &str, out: &str) -> RepoStatus {
+fn parse_status(
+    path: &str,
+    name: &str,
+    out: &str,
+    remote_provider: Option<String>,
+) -> RepoStatus {
     let mut branch = None;
     let mut upstream = None;
     let mut ahead = 0u32;
@@ -263,6 +275,7 @@ fn parse_status(path: &str, name: &str, out: &str) -> RepoStatus {
         behind,
         dirty,
         last_error: None,
+        remote_provider,
     }
 }
 
@@ -439,6 +452,94 @@ fn list_remotes(path: &str) -> Result<Vec<RemoteInfo>, String> {
     Ok(remotes)
 }
 
+fn primary_remote_url(path: &str) -> Option<String> {
+    let remotes = list_remotes(path).ok()?;
+    if remotes.is_empty() {
+        return None;
+    }
+    remotes
+        .iter()
+        .find(|r| r.name == "origin")
+        .or_else(|| remotes.first())
+        .map(|r| r.url.clone())
+}
+
+fn detect_remote_provider(path: &str) -> Option<String> {
+    let url = primary_remote_url(path)?;
+    Some(provider_from_remote_url(&url).to_string())
+}
+
+fn provider_from_remote_url(url: &str) -> &'static str {
+    let Some(host) = remote_url_host(url) else {
+        return "other";
+    };
+    let host = host.to_ascii_lowercase();
+
+    if host == "github.com" || host.ends_with(".github.com") {
+        "github"
+    } else if host == "gitlab.com" || host.ends_with(".gitlab.com") || host.contains("gitlab") {
+        "gitlab"
+    } else if host == "bitbucket.org" || host.ends_with(".bitbucket.org") || host.contains("bitbucket")
+    {
+        "bitbucket"
+    } else if host == "codeberg.org" || host.ends_with(".codeberg.org") {
+        "codeberg"
+    } else if host.contains("gitea") || host == "gitea.com" {
+        "gitea"
+    } else if host == "dev.azure.com"
+        || host.ends_with(".visualstudio.com")
+        || host.contains("azure.com")
+    {
+        "azure"
+    } else {
+        "other"
+    }
+}
+
+/// Extract host from common git remote URL forms:
+/// - https://github.com/user/repo.git
+/// - git@github.com:user/repo.git
+/// - ssh://git@gitlab.com/user/repo.git
+fn remote_url_host(url: &str) -> Option<String> {
+    let url = url.trim();
+    if url.is_empty() {
+        return None;
+    }
+
+    if let Some(rest) = url.strip_prefix("git@") {
+        let host = rest.split(':').next()?.trim();
+        return if host.is_empty() {
+            None
+        } else {
+            Some(host.to_string())
+        };
+    }
+
+    let without_scheme = if let Some(idx) = url.find("://") {
+        &url[idx + 3..]
+    } else {
+        url
+    };
+
+    let without_auth = without_scheme
+        .rsplit('@')
+        .next()
+        .unwrap_or(without_scheme);
+
+    let host = without_auth
+        .split('/')
+        .next()?
+        .split(':')
+        .next()?
+        .trim();
+
+    if host.is_empty() {
+        None
+    } else {
+        Some(host.to_string())
+    }
+}
+
 fn list_commits(path: &str, limit: usize) -> Result<Vec<CommitInfo>, String> {
     let out = run_git(
         path,
@@ -491,7 +592,7 @@ fn list_changed_files(path: &str, limit: usize) -> Result<Vec<String>, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_status;
+    use super::{parse_status, provider_from_remote_url, remote_url_host};
 
     #[test]
     fn parses_branch_ahead_behind_and_dirty() {
@@ -501,12 +602,65 @@ mod tests {
 # branch.ab +1 -2
 ? untracked.txt
 ";
-        let st = parse_status("/tmp/demo", "demo", out);
+        let st = parse_status("/tmp/demo", "demo", out, Some("github".into()));
         assert_eq!(st.branch.as_deref(), Some("main"));
         assert_eq!(st.upstream.as_deref(), Some("origin/main"));
         assert_eq!(st.ahead, 1);
         assert_eq!(st.behind, 2);
         assert!(st.dirty);
+        assert_eq!(st.remote_provider.as_deref(), Some("github"));
+    }
+
+    #[test]
+    fn parses_https_and_ssh_hosts() {
+        assert_eq!(
+            remote_url_host("https://github.com/user/repo.git").as_deref(),
+            Some("github.com")
+        );
+        assert_eq!(
+            remote_url_host("git@github.com:user/repo.git").as_deref(),
+            Some("github.com")
+        );
+        assert_eq!(
+            remote_url_host("ssh://git@gitlab.com/user/repo.git").as_deref(),
+            Some("gitlab.com")
+        );
+        assert_eq!(
+            remote_url_host("https://user@bitbucket.org/user/repo.git").as_deref(),
+            Some("bitbucket.org")
+        );
+    }
+
+    #[test]
+    fn detects_common_providers() {
+        assert_eq!(
+            provider_from_remote_url("https://github.com/a/b.git"),
+            "github"
+        );
+        assert_eq!(
+            provider_from_remote_url("git@gitlab.com:a/b.git"),
+            "gitlab"
+        );
+        assert_eq!(
+            provider_from_remote_url("https://bitbucket.org/a/b.git"),
+            "bitbucket"
+        );
+        assert_eq!(
+            provider_from_remote_url("https://codeberg.org/a/b.git"),
+            "codeberg"
+        );
+        assert_eq!(
+            provider_from_remote_url("https://gitea.example.com/a/b.git"),
+            "gitea"
+        );
+        assert_eq!(
+            provider_from_remote_url("https://dev.azure.com/org/project/_git/repo"),
+            "azure"
+        );
+        assert_eq!(
+            provider_from_remote_url("https://git.example.com/a/b.git"),
+            "other"
+        );
     }
 }
 

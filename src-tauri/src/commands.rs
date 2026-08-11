@@ -400,6 +400,7 @@ async fn run_batch(
                         behind: 0,
                         dirty: false,
                         last_error: Some(format!("task join error: {e}")),
+                        remote_provider: None,
                     },
                 )
             });

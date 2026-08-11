@@ -9,7 +9,12 @@ export type RepoStatus = {
   behind: number;
   dirty: boolean;
   lastError: string | null;
+  /** Detected remote host provider, or null when no remote is configured. */
+  remoteProvider: RemoteProvider | string | null;
 };
+
+export type RemoteProvider =
+  "github" | "gitlab" | "bitbucket" | "gitea" | "codeberg" | "azure" | "other";
 
 export type RemovedRepo = {
   path: string;
@@ -87,8 +92,7 @@ export const api = {
   addRepo: (path: string) => invoke<RepoStatus>("add_repo", { path }),
   removeRepo: (path: string) => invoke<void>("remove_repo", { path }),
   removeRepos: (paths: string[]) => invoke<void>("remove_repos", { paths }),
-  reorderRepos: (paths: string[]) =>
-    invoke<void>("reorder_repos", { paths }),
+  reorderRepos: (paths: string[]) => invoke<void>("reorder_repos", { paths }),
   refreshStatus: (paths?: string[]) =>
     invoke<RefreshResult>("refresh_status", { paths: paths ?? null }),
   scanFolder: (path: string, maxDepth?: number) =>
@@ -96,10 +100,8 @@ export const api = {
       path,
       maxDepth: maxDepth ?? null,
     }),
-  batchFetch: (paths: string[]) =>
-    invoke<RepoStatus[]>("batch_fetch", { paths }),
-  batchUpdate: (paths: string[]) =>
-    invoke<RepoStatus[]>("batch_update", { paths }),
+  batchFetch: (paths: string[]) => invoke<RepoStatus[]>("batch_fetch", { paths }),
+  batchUpdate: (paths: string[]) => invoke<RepoStatus[]>("batch_update", { paths }),
   repoDetail: (path: string) => invoke<RepoDetail>("repo_detail", { path }),
   addRemote: (path: string, name: string, url: string) =>
     invoke<RepoDetail>("add_remote", { path, name, url }),

@@ -1,12 +1,10 @@
-import { memo, type PointerEvent as ReactPointerEvent } from "react";
-import { FolderGit2Icon } from "lucide-react";
+import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useI18n } from "@/i18n";
+import { RemoteProviderIcon } from "@/components/repo/RemoteProviderIcon";
+import { useI18n } from "@/hooks/useI18n";
 import type { BatchProgress, RepoStatus } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
-import { useAppStore } from "@/stores/appStore";
 
 export const RepoCardBody = memo(function RepoCardBody({
   repo,
@@ -37,9 +35,9 @@ export const RepoCardBody = memo(function RepoCardBody({
           />
         </div>
         <div className="repo-card-icon" aria-hidden="true">
-          <FolderGit2Icon className="size-4" />
+          <RemoteProviderIcon provider={repo.remoteProvider} />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 pr-6">
           <div className="flex min-w-0 items-center gap-2">
             <h3
               className="min-w-0 flex-1 truncate text-sm leading-snug font-bold tracking-tight"
@@ -76,72 +74,6 @@ export const RepoCardBody = memo(function RepoCardBody({
           {repo.path}
         </p>
       </div>
-    </div>
-  );
-});
-
-/** Card that subscribes to its own progress slice — avoids grid-wide re-renders. */
-export const RepoGridCard = memo(function RepoGridCard({
-  repo,
-  selected,
-  isDragging,
-  isPressing,
-  onToggle,
-  onOpenDetail,
-  onPointerDown,
-  shouldIgnoreClick,
-}: {
-  repo: RepoStatus;
-  selected: boolean;
-  isDragging: boolean;
-  isPressing: boolean;
-  onToggle: (path: string) => void;
-  onOpenDetail: (repo: RepoStatus) => void;
-  onPointerDown: (repo: RepoStatus, event: ReactPointerEvent<HTMLElement>) => void;
-  shouldIgnoreClick: () => boolean;
-}) {
-  const progress = useAppStore((s) => s.progress[repo.path]);
-
-  return (
-    <div
-      role="listitem"
-      data-repo-path={repo.path}
-      className="repo-card-slot min-w-0"
-    >
-      <Card
-        size="sm"
-        className={cn(
-          "repo-card h-full cursor-pointer gap-0 border bg-card py-0",
-          selected && !isDragging && "is-selected",
-          isDragging && "is-drag-slot",
-          isPressing && !isDragging && "is-long-pressing",
-        )}
-        aria-hidden={isDragging || undefined}
-        onPointerDown={(e) => {
-          if (isDragging) return;
-          onPointerDown(repo, e);
-        }}
-        onContextMenu={(e) => {
-          if (isDragging || isPressing) e.preventDefault();
-        }}
-        onClick={(e) => {
-          if (shouldIgnoreClick() || isDragging) return;
-          const target = e.target as HTMLElement;
-          if (target.closest("button, input, a, label, [data-slot='checkbox']")) {
-            return;
-          }
-          onOpenDetail(repo);
-        }}
-      >
-        {/* Keep body mounted (invisible) so slot size never jumps. */}
-        <RepoCardBody
-          className={cn(isDragging && "invisible")}
-          repo={repo}
-          progress={progress}
-          selected={selected}
-          onToggle={onToggle}
-        />
-      </Card>
     </div>
   );
 });

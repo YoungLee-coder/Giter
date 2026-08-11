@@ -1,5 +1,19 @@
-import { useEffect, useId, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { Update } from "@tauri-apps/plugin-updater";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+} from "framer-motion";
 import {
   ArrowLeftIcon,
   ChevronRightIcon,
@@ -8,6 +22,7 @@ import {
   InfoIcon,
   RefreshCwIcon,
 } from "lucide-react";
+import { useForm, type Resolver } from "react-hook-form";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { Badge } from "@/components/ui/badge";
@@ -20,12 +35,35 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { useI18n } from "@/i18n";
+import { useI18n } from "@/hooks/useI18n";
+import { useSettings } from "@/hooks/useSettings";
 import { APP_NAME, GITHUB_URL, RELEASES_URL } from "@/lib/app";
-import type { GitInfo } from "@/lib/tauri";
+import { settingsPane, settingsResize } from "@/lib/motion";
+import {
+  settingsFormSchema,
+  type SettingsFormValues,
+} from "@/lib/settingsSchema";
+import { api, type AppInfo, type GitInfo } from "@/lib/tauri";
+import {
+  checkForAppUpdate,
+  clearDismissedUpdateVersion,
+  downloadAndInstallUpdate,
+  formatUpdateError,
+  markUpdateChecked,
+  relaunchApp,
+} from "@/lib/updater";
 import { cn } from "@/lib/utils";
-import { useSettingsModalStore } from "@/stores/settingsModalStore";
-import { useSettings } from "@/stores/settingsStore";
+
+type SettingsPane = "main" | "git" | "about";
+
+type UpdateUiState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "upToDate" }
+  | { kind: "available"; update: Update }
+  | { kind: "downloading"; update: Update; percent: number }
+  | { kind: "installing"; update: Update }
+  | { kind: "error"; message: string };
 
 type Props = {
   open: boolean;
@@ -34,54 +72,175 @@ type Props = {
 
 export function SettingsModal({ open, onClose }: Props) {
   const { t } = useI18n();
-  const { settings } = useSettings();
-  const pane = useSettingsModalStore((s) => s.pane);
-  const appInfo = useSettingsModalStore((s) => s.appInfo);
-  const gitInfo = useSettingsModalStore((s) => s.gitInfo);
-  const gitLoading = useSettingsModalStore((s) => s.gitLoading);
-  const scanDepthDraft = useSettingsModalStore((s) => s.scanDepthDraft);
-  const concurrencyDraft = useSettingsModalStore((s) => s.concurrencyDraft);
-  const updateState = useSettingsModalStore((s) => s.updateState);
-  const setPane = useSettingsModalStore((s) => s.setPane);
-  const setScanDepthDraft = useSettingsModalStore((s) => s.setScanDepthDraft);
-  const setConcurrencyDraft = useSettingsModalStore((s) => s.setConcurrencyDraft);
-  const resetOnClose = useSettingsModalStore((s) => s.resetOnClose);
-  const syncDraftsFromSettings = useSettingsModalStore((s) => s.syncDraftsFromSettings);
-  const loadAppInfo = useSettingsModalStore((s) => s.loadAppInfo);
-  const loadGitInfo = useSettingsModalStore((s) => s.loadGitInfo);
-  const commitNumber = useSettingsModalStore((s) => s.commitNumber);
-  const checkForUpdates = useSettingsModalStore((s) => s.checkForUpdates);
-  const installUpdate = useSettingsModalStore((s) => s.installUpdate);
+  const { settings, updateSettings } = useSettings();
+  const reduceMotion = useReducedMotion();
+  const [pane, setPane] = useState<SettingsPane>("main");
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+  const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
+  const [gitLoading, setGitLoading] = useState(false);
+  const [updateState, setUpdateState] = useState<UpdateUiState>({
+    kind: "idle",
+  });
+  const [bodyHeight, setBodyHeight] = useState<number | "auto">("auto");
+  const paneContentRef = useRef<HTMLDivElement>(null);
+  const resizeAnimating = useRef(false);
+  const appInfoSeq = useRef(0);
+  const gitInfoSeq = useRef(0);
+  const gitInfoRef = useRef<GitInfo | null>(null);
+  gitInfoRef.current = gitInfo;
   const scanDepthId = useId();
   const concurrencyId = useId();
+
+  const form = useForm<SettingsFormValues>({
+    resolver: zodResolver(settingsFormSchema) as Resolver<SettingsFormValues>,
+    defaultValues: {
+      scanDepth: settings.scanDepth,
+      concurrency: settings.concurrency,
+    },
+  });
+
   const updateBusy =
     updateState.kind === "checking" ||
     updateState.kind === "downloading" ||
     updateState.kind === "installing";
 
-  useEffect(() => {
-    if (!open) {
-      resetOnClose();
+  const loadAppInfo = async () => {
+    const seq = ++appInfoSeq.current;
+    try {
+      const info = await api.getAppInfo();
+      if (seq !== appInfoSeq.current) return;
+      setAppInfo(info);
+    } catch {
+      if (seq !== appInfoSeq.current) return;
+      setAppInfo(null);
+    }
+  };
+
+  const loadGitInfo = async () => {
+    const seq = ++gitInfoSeq.current;
+    if (!gitInfoRef.current) setGitLoading(true);
+    try {
+      const info = await api.getGitInfo();
+      if (seq !== gitInfoSeq.current) return;
+      setGitInfo(info);
+    } catch {
+      if (seq !== gitInfoSeq.current) return;
+      setGitInfo(null);
+    } finally {
+      if (seq === gitInfoSeq.current) setGitLoading(false);
+    }
+  };
+
+  const commitField = async (field: keyof SettingsFormValues) => {
+    const ok = await form.trigger(field);
+    if (!ok) {
+      form.setValue(field, settings[field], { shouldValidate: false });
       return;
     }
-    syncDraftsFromSettings();
-  }, [open, settings.scanDepth, settings.concurrency, resetOnClose, syncDraftsFromSettings]);
+    const value = form.getValues(field);
+    if (value !== settings[field]) {
+      void updateSettings({ [field]: value });
+    }
+  };
+
+  const checkForUpdates = async () => {
+    setUpdateState({ kind: "checking" });
+    markUpdateChecked();
+    try {
+      const update = await checkForAppUpdate();
+      if (!update) {
+        setUpdateState({ kind: "upToDate" });
+        return;
+      }
+      clearDismissedUpdateVersion();
+      setUpdateState({ kind: "available", update });
+    } catch (error) {
+      setUpdateState({
+        kind: "error",
+        message: formatUpdateError(error),
+      });
+    }
+  };
+
+  const installUpdate = async (update: Update) => {
+    setUpdateState({ kind: "downloading", update, percent: 0 });
+    try {
+      await downloadAndInstallUpdate(update, ({ downloaded, contentLength }) => {
+        const percent =
+          contentLength && contentLength > 0
+            ? Math.min(100, Math.round((downloaded / contentLength) * 100))
+            : 0;
+        setUpdateState({ kind: "downloading", update, percent });
+      });
+      setUpdateState({ kind: "installing", update });
+      await relaunchApp();
+    } catch (error) {
+      setUpdateState({
+        kind: "error",
+        message: formatUpdateError(error),
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setPane("main");
+      setUpdateState({ kind: "idle" });
+      setBodyHeight("auto");
+      resizeAnimating.current = false;
+      return;
+    }
+    form.reset({
+      scanDepth: settings.scanDepth,
+      concurrency: settings.concurrency,
+    });
+  }, [open, settings.scanDepth, settings.concurrency, form]);
 
   useEffect(() => {
     if (!open) return;
     void loadAppInfo();
     void loadGitInfo();
-  }, [open, loadAppInfo, loadGitInfo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once when opened
+  }, [open]);
 
   useEffect(() => {
     if (!open || pane !== "git") return;
     void loadGitInfo();
-  }, [open, pane, loadGitInfo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when entering git pane
+  }, [open, pane]);
 
-  const goPane = (next: "main" | "git" | "about") => {
+  // After a pane swap, measure the new content and animate height toward it.
+  useLayoutEffect(() => {
+    if (!open || !resizeAnimating.current || reduceMotion) return;
+    const node = paneContentRef.current;
+    if (!node) return;
+    const next = node.offsetHeight;
+    setBodyHeight((prev) => {
+      if (prev === "auto" || prev === next) {
+        resizeAnimating.current = false;
+        return "auto";
+      }
+      return next;
+    });
+  }, [open, pane, reduceMotion, gitLoading, gitInfo, t]);
+
+  const goPane = (next: SettingsPane) => {
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
+    if (next === pane) return;
+
+    if (!reduceMotion && paneContentRef.current) {
+      // Lock current height so the card can morph instead of snapping.
+      setBodyHeight(paneContentRef.current.offsetHeight);
+      resizeAnimating.current = true;
+    }
     setPane(next);
+  };
+
+  const onBodyResizeComplete = () => {
+    if (!resizeAnimating.current) return;
+    resizeAnimating.current = false;
+    setBodyHeight("auto");
   };
 
   const title =
@@ -91,25 +250,20 @@ export function SettingsModal({ open, onClose }: Props) {
         ? t("aboutLabel")
         : t("settingsTitle");
 
-  const updateTitle =
-    updateState.kind === "available"
-      ? t("downloadAndInstall")
-      : updateState.kind === "checking"
-        ? t("checkingForUpdates")
-        : updateState.kind === "downloading"
-          ? t("downloadingUpdate", { percent: updateState.percent })
-          : updateState.kind === "installing"
-            ? t("installingUpdate")
-            : t("checkForUpdates");
-
-  const updateHint =
-    updateState.kind === "upToDate"
-      ? t("upToDate")
-      : updateState.kind === "available"
-        ? t("updateAvailable", { version: updateState.update.version })
-        : updateState.kind === "error"
-          ? t("updateFailed", { error: updateState.message })
-          : undefined;
+  const updateRowValue =
+    updateState.kind === "checking"
+      ? t("checkingForUpdates")
+      : updateState.kind === "upToDate"
+        ? t("upToDate")
+        : updateState.kind === "available"
+          ? t("updateAvailable", { version: updateState.update.version })
+          : updateState.kind === "downloading"
+            ? t("downloadingUpdate", { percent: updateState.percent })
+            : updateState.kind === "installing"
+              ? t("installingUpdate")
+              : updateState.kind === "error"
+                ? t("updateFailed", { error: updateState.message })
+                : undefined;
 
   return (
     <Dialog
@@ -151,145 +305,211 @@ export function SettingsModal({ open, onClose }: Props) {
           </div>
         </DialogHeader>
 
-        <div className="settings-body min-h-[28rem] px-4 py-4">
-          {pane === "main" ? (
-            <div className="flex min-w-0 flex-col gap-5">
-              <SettingsSection title={t("settingsSectionAppearance")}>
-                <SettingsPrefRow
-                  title={t("langLabel")}
-                  hint={t("settingsLanguageHint")}
-                  control={<LanguageSwitch />}
-                />
-                <SettingsPrefRow
-                  title={t("themeLabel")}
-                  hint={t("themeHint")}
-                  control={<ThemeSwitch />}
-                />
-              </SettingsSection>
-
-              <SettingsSection title={t("settingsSectionScanning")}>
-                <SettingsPrefRow
-                  title={t("scanDepthLabel")}
-                  hint={t("scanDepthHint")}
-                  htmlFor={scanDepthId}
-                  control={
-                    <Input
-                      id={scanDepthId}
-                      className="w-[4.25rem] text-center tabular-nums"
-                      type="number"
-                      min={1}
-                      max={10}
-                      inputMode="numeric"
-                      value={scanDepthDraft}
-                      onChange={(event) => setScanDepthDraft(event.target.value)}
-                      onBlur={() =>
-                        commitNumber(
-                          "scanDepth",
-                          scanDepthDraft,
-                          1,
-                          10,
-                          settings.scanDepth,
-                        )
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          (event.target as HTMLInputElement).blur();
-                        }
-                      }}
-                    />
-                  }
-                />
-                <SettingsPrefRow
-                  title={t("concurrencyLabel")}
-                  hint={t("concurrencyHint")}
-                  htmlFor={concurrencyId}
-                  control={
-                    <Input
-                      id={concurrencyId}
-                      className="w-[4.25rem] text-center tabular-nums"
-                      type="number"
-                      min={1}
-                      max={16}
-                      inputMode="numeric"
-                      value={concurrencyDraft}
-                      onChange={(event) => setConcurrencyDraft(event.target.value)}
-                      onBlur={() =>
-                        commitNumber(
-                          "concurrency",
-                          concurrencyDraft,
-                          1,
-                          16,
-                          settings.concurrency,
-                        )
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          (event.target as HTMLInputElement).blur();
-                        }
-                      }}
-                    />
-                  }
-                />
-              </SettingsSection>
-
-              <SettingsSection title={t("settingsSectionSystem")}>
-                <SettingsNavRow
-                  icon={<GitBranchIcon />}
-                  title={t("gitMenuLabel")}
-                  hint={t("gitMenuHint")}
-                  value={
-                    appInfo == null ? (
-                      "…"
-                    ) : (
-                      <Badge
-                        variant={appInfo.gitAvailable ? "secondary" : "destructive"}
-                        className="rounded-[6px]"
-                      >
-                        {appInfo.gitAvailable ? t("gitReady") : t("gitMissing")}
-                      </Badge>
-                    )
-                  }
-                  onClick={() => goPane("git")}
-                />
-                <SettingsNavRow
-                  icon={
-                    updateBusy ? (
-                      <Spinner className="size-4" />
-                    ) : (
-                      <RefreshCwIcon />
-                    )
-                  }
-                  title={updateTitle}
-                  hint={updateHint}
-                  hintTone={updateState.kind === "error" ? "err" : "default"}
-                  disabled={updateBusy}
-                  showChevron={false}
-                  onClick={() => {
-                    if (updateState.kind === "available") {
-                      void installUpdate(updateState.update);
-                      return;
-                    }
-                    void checkForUpdates();
-                  }}
-                />
-                <SettingsNavRow
-                  icon={<InfoIcon />}
-                  title={t("aboutLabel")}
-                  hint={t("aboutMenuHint")}
-                  value={appInfo?.version ?? "…"}
-                  onClick={() => goPane("about")}
-                />
-              </SettingsSection>
-            </div>
-          ) : pane === "git" ? (
-            <GitInfoPane loading={gitLoading} info={gitInfo} />
-          ) : (
-            <AboutPane
-              name={appInfo?.name ?? APP_NAME}
-              version={appInfo?.version ?? null}
-            />
+        <motion.div
+          className={cn(
+            "settings-body max-h-[min(85vh,calc(100dvh-6rem))] overflow-x-hidden",
+            typeof bodyHeight === "number"
+              ? "overflow-y-hidden"
+              : "overflow-y-auto",
           )}
-        </div>
+          initial={false}
+          // Only drive height while morphing between panes. Leaving
+          // `height: "auto"` in `animate` can bake a short pixel height on
+          // first open and clip the last rows.
+          animate={
+            typeof bodyHeight === "number" ? { height: bodyHeight } : undefined
+          }
+          style={
+            typeof bodyHeight === "number" ? undefined : { height: "auto" }
+          }
+          transition={
+            reduceMotion ? { duration: 0 } : settingsResize.transition
+          }
+          onAnimationComplete={onBodyResizeComplete}
+        >
+          <div className="relative">
+            <AnimatePresence initial={false} mode="popLayout">
+              <motion.div
+                key={pane}
+                ref={paneContentRef}
+                data-settings-pane={pane}
+                className="px-4 py-4"
+                initial={reduceMotion ? false : settingsPane.initial}
+                animate={settingsPane.animate}
+                exit={reduceMotion ? undefined : settingsPane.exit}
+                transition={
+                  reduceMotion ? { duration: 0 } : settingsPane.transition
+                }
+              >
+                {pane === "main" ? (
+                  <form
+                    className="flex min-h-[28.5rem] min-w-0 flex-col gap-5"
+                    onSubmit={form.handleSubmit((values) => {
+                      const patch: Partial<SettingsFormValues> = {};
+                      if (values.scanDepth !== settings.scanDepth) {
+                        patch.scanDepth = values.scanDepth;
+                      }
+                      if (values.concurrency !== settings.concurrency) {
+                        patch.concurrency = values.concurrency;
+                      }
+                      if (Object.keys(patch).length > 0) {
+                        void updateSettings(patch);
+                      }
+                    })}
+                  >
+                    <SettingsSection title={t("settingsSectionAppearance")}>
+                      <SettingsPrefRow
+                        title={t("langLabel")}
+                        hint={t("settingsLanguageHint")}
+                        control={<LanguageSwitch />}
+                      />
+                      <SettingsPrefRow
+                        title={t("themeLabel")}
+                        hint={t("themeHint")}
+                        control={<ThemeSwitch />}
+                      />
+                    </SettingsSection>
+
+                    <SettingsSection title={t("settingsSectionScanning")}>
+                      <SettingsPrefRow
+                        title={t("scanDepthLabel")}
+                        hint={t("scanDepthHint")}
+                        htmlFor={scanDepthId}
+                        control={
+                          <Input
+                            id={scanDepthId}
+                            className="w-[4.25rem] text-center tabular-nums"
+                            type="number"
+                            min={1}
+                            max={10}
+                            inputMode="numeric"
+                            {...form.register("scanDepth", {
+                              valueAsNumber: true,
+                              onBlur: () => {
+                                void commitField("scanDepth");
+                              },
+                            })}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                (event.target as HTMLInputElement).blur();
+                              }
+                            }}
+                          />
+                        }
+                      />
+                      <SettingsPrefRow
+                        title={t("concurrencyLabel")}
+                        hint={t("concurrencyHint")}
+                        htmlFor={concurrencyId}
+                        control={
+                          <Input
+                            id={concurrencyId}
+                            className="w-[4.25rem] text-center tabular-nums"
+                            type="number"
+                            min={1}
+                            max={16}
+                            inputMode="numeric"
+                            {...form.register("concurrency", {
+                              valueAsNumber: true,
+                              onBlur: () => {
+                                void commitField("concurrency");
+                              },
+                            })}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                (event.target as HTMLInputElement).blur();
+                              }
+                            }}
+                          />
+                        }
+                      />
+                    </SettingsSection>
+
+                    <SettingsSection title={t("settingsSectionSystem")}>
+                      <SettingsNavRow
+                        icon={<GitBranchIcon />}
+                        title={t("gitMenuLabel")}
+                        hint={t("gitMenuHint")}
+                        value={
+                          appInfo == null ? (
+                            "…"
+                          ) : (
+                            <Badge
+                              variant={
+                                appInfo.gitAvailable
+                                  ? "secondary"
+                                  : "destructive"
+                              }
+                              className="rounded-[6px]"
+                            >
+                              {appInfo.gitAvailable
+                                ? t("gitReady")
+                                : t("gitMissing")}
+                            </Badge>
+                          )
+                        }
+                        onClick={() => goPane("git")}
+                      />
+                      <SettingsNavRow
+                        icon={
+                          updateBusy ? (
+                            <Spinner className="size-4" />
+                          ) : (
+                            <RefreshCwIcon />
+                          )
+                        }
+                        title={t("checkForUpdates")}
+                        value={
+                          updateRowValue ? (
+                            <span
+                              className={cn(
+                                "max-w-[11rem] truncate text-xs text-pretty",
+                                updateState.kind === "error" &&
+                                  "text-destructive",
+                                updateState.kind === "upToDate" &&
+                                  "text-muted-foreground",
+                              )}
+                              title={
+                                updateState.kind === "error"
+                                  ? updateState.message
+                                  : undefined
+                              }
+                            >
+                              {updateRowValue}
+                            </span>
+                          ) : undefined
+                        }
+                        disabled={updateBusy}
+                        showChevron={false}
+                        onClick={() => {
+                          if (updateState.kind === "available") {
+                            void installUpdate(updateState.update);
+                            return;
+                          }
+                          void checkForUpdates();
+                        }}
+                      />
+                      <SettingsNavRow
+                        icon={<InfoIcon />}
+                        title={t("aboutLabel")}
+                        hint={t("aboutMenuHint")}
+                        value={appInfo?.version ?? "…"}
+                        onClick={() => goPane("about")}
+                      />
+                    </SettingsSection>
+                  </form>
+                ) : pane === "git" ? (
+                  <GitInfoPane loading={gitLoading} info={gitInfo} />
+                ) : (
+                  <AboutPane
+                    name={appInfo?.name ?? APP_NAME}
+                    version={appInfo?.version ?? null}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );

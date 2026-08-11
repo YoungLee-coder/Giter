@@ -55,14 +55,14 @@ The app stores paths only in `repos.json` under the app data directory. **Remove
 Prerequisites: [Node.js](https://nodejs.org/) 18+, [Rust](https://rustup.rs/) stable, Git on `PATH`, and [Tauri 2 platform tooling](https://v2.tauri.app/start/prerequisites/).
 
 ```bash
-npm install
-npm run tauri dev
+pnpm install
+pnpm tauri dev
 ```
 
 ### Build
 
 ```bash
-npm run tauri build
+pnpm tauri build
 ```
 
 Artifacts: macOS `.dmg`; Windows NSIS / MSI. CI publishes the same when the version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` bumps on `main`. Releases also upload signed updater bundles and `latest.json` for in-app updates.
@@ -71,7 +71,7 @@ Release CI needs repository secrets `TAURI_SIGNING_PRIVATE_KEY` (required) and o
 
 ### Stack
 
-Tauri 2 (Rust) · Vite + React + TypeScript · system `git` CLI
+Tauri 2 (Rust) · Vite + React + TypeScript · pnpm · TanStack Query · i18next · system `git` CLI
 
 ---
 
@@ -128,14 +128,14 @@ xattr -cr /Applications/Giter.app
 依赖：[Node.js](https://nodejs.org/) 18+、[Rust](https://rustup.rs/) stable、`PATH` 中的 Git，以及 [Tauri 2 平台工具](https://v2.tauri.app/start/prerequisites/)。
 
 ```bash
-npm install
-npm run tauri dev
+pnpm install
+pnpm tauri dev
 ```
 
 ### 构建
 
 ```bash
-npm run tauri build
+pnpm tauri build
 ```
 
 产物：macOS `.dmg`；Windows NSIS / MSI。当 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` 三者版本一致并在 `main` 上递增时，CI 会发布同样的包。发布还会上传签名的更新包与 `latest.json`，供应用内更新使用。
@@ -144,4 +144,4 @@ npm run tauri build
 
 ### 技术栈
 
-Tauri 2（Rust）· Vite + React + TypeScript · 系统 `git` CLI
+Tauri 2（Rust）· Vite + React + TypeScript · pnpm · TanStack Query · i18next · 系统 `git` CLI
