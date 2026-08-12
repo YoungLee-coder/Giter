@@ -39,8 +39,13 @@ export const DRAG_REGION_STYLE: Record<string, unknown> = DRAG_REGION_ENABLED
   ? { WebkitAppRegion: "drag" }
   : {};
 
-/** macOS overlay title bar drag strip above the app header — matches cc-switch. */
-export const DEFAULT_DRAG_BAR_HEIGHT = isWindows() || isLinux() ? 0 : 28;
+/**
+ * Top chrome inset above the app header.
+ * - macOS: overlay title bar / traffic lights (matches cc-switch)
+ * - Windows: breathing room under the window edge with Overlay chrome
+ * - Linux: none (drag regions disabled — Tauri #13440)
+ */
+export const DEFAULT_DRAG_BAR_HEIGHT = isLinux() ? 0 : isWindows() ? 16 : 28;
 
 export function getDragBarHeight(): number {
   return DEFAULT_DRAG_BAR_HEIGHT;

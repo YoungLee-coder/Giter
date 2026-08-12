@@ -44,8 +44,7 @@
 
 :root {
     color-scheme: light;
-    /* Soft layered surfaces — Clash Party–like content tiles on cool canvas */
-    --background: #eef0f4;
+    --background: #ffffff;
     --foreground: rgba(0, 0, 0, 0.86);
     --card: #ffffff;
     --card-foreground: rgba(0, 0, 0, 0.86);
@@ -55,7 +54,7 @@
     --primary-foreground: #ffffff;
     --secondary: rgba(0, 0, 0, 0.055);
     --secondary-foreground: rgba(0, 0, 0, 0.86);
-    --muted: #e4e7ec;
+    --muted: #f0f1f4;
     --muted-foreground: rgba(0, 0, 0, 0.52);
     --accent: color-mix(in srgb, var(--primary) 10%, transparent);
     --accent-foreground: rgba(0, 0, 0, 0.86);
@@ -63,7 +62,7 @@
     --border: rgba(0, 0, 0, 0.08);
     --input: rgba(0, 0, 0, 0.12);
     --ring: rgba(10, 132, 255, 0.4);
-    --toolbar: color-mix(in srgb, #eef0f4 82%, #ffffff);
+    --toolbar: #ffffff;
     --ok: #248a3d;
     --warn: #9a6700;
     --run: #0071e3;
@@ -227,7 +226,9 @@
 }
 
 /* Tauri window chrome — drag bar (traffic lights) + fixed app header */
-.app-header {
+.app-header,
+.settings-header,
+.settings-page-header {
   user-select: none;
 }
 
@@ -249,7 +250,469 @@
 .app-header [data-slot="button"],
 .app-header [data-slot="checkbox"],
 .app-header [data-slot="dropdown-menu-trigger"],
-.app-header [data-slot="popover-trigger"] {
+.app-header [data-slot="popover-trigger"],
+/* Settings page — System Settings–style sidebar + preference panes */
+.settings-page-header {
+  user-select: none;
+}
+
+.settings-back {
+  display: flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--radius-lg) * 0.75);
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  background: var(--card);
+  box-shadow: var(--shadow-control);
+}
+
+.settings-shell {
+  min-height: 0;
+  background: var(--background);
+}
+
+.settings-sidebar {
+  display: none;
+  width: 13.5rem;
+  flex-shrink: 0;
+  border-right: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: var(--background);
+  padding: 1rem 0.75rem;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.settings-nav-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.65rem;
+  border: 0;
+  border-radius: calc(var(--radius-lg) * 0.75);
+  background: transparent;
+  padding: 0.5rem 0.6rem;
+  color: var(--muted-foreground);
+  text-align: left;
+  transition:
+    background-color var(--motion-duration-color) var(--motion-ease-out),
+    color var(--motion-duration-color) var(--motion-ease-out);
+}
+
+.settings-nav-item:hover:not([data-active="true"]) {
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  color: var(--foreground);
+}
+
+.settings-nav-item[data-active="true"] {
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+  color: var(--primary);
+}
+
+.settings-nav-icon {
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.settings-nav-label {
+  min-width: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.settings-body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 1.25rem 1.25rem 2rem;
+  background: var(--background);
+}
+
+.settings-content {
+  width: 100%;
+  max-width: 40rem;
+  margin-inline: auto;
+}
+
+.settings-pane-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+
+.settings-pane-icon {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  background: color-mix(in srgb, var(--muted) 55%, var(--card));
+  color: var(--foreground);
+  box-shadow: var(--shadow-control);
+}
+
+.settings-pane-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.settings-pane-desc {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+.settings-section-label {
+  margin: 0 0 0.5rem 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted-foreground);
+  text-transform: none;
+}
+
+.settings-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+}
+
+.settings-field-row + .settings-field-row {
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.settings-field-row--stack {
+  gap: 0.85rem;
+}
+
+.settings-field-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.settings-field-row-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.settings-field-row-desc {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+
+.settings-field-row-control {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.settings-stepper-btn {
+  display: inline-flex;
+  width: 1.85rem;
+  height: 1.85rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--radius-lg) * 0.65);
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--shadow-control);
+  transition:
+    background-color var(--motion-duration-color) var(--motion-ease-out),
+    opacity var(--motion-duration-color) var(--motion-ease-out);
+}
+
+.settings-stepper-btn:hover:not(:disabled) {
+  background: var(--secondary);
+}
+
+.settings-stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.settings-stepper-input {
+  width: 3.5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  /* hide native number spinners — we provide steppers */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.settings-stepper-input::-webkit-outer-spin-button,
+.settings-stepper-input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.settings-status-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: calc(var(--radius-lg) * 0.95);
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  padding: 1rem 1.1rem;
+}
+
+.settings-status-card--ok {
+  border-color: color-mix(in srgb, var(--ok) 28%, var(--border));
+  background: color-mix(in srgb, var(--ok) 8%, var(--card));
+}
+
+.settings-status-card--warn {
+  border-color: color-mix(in srgb, var(--destructive) 28%, var(--border));
+  background: color-mix(in srgb, var(--destructive) 8%, var(--card));
+}
+
+.settings-status-card-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.settings-status-card-desc {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+
+.settings-status-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+
+.settings-status-dot--ok {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent);
+}
+
+.settings-status-dot--warn {
+  background: var(--destructive);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--destructive) 22%, transparent);
+}
+
+.settings-about-hero {
+  overflow: hidden;
+  border-radius: calc(var(--radius-lg) * 0.95);
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  background:
+    radial-gradient(
+      120% 80% at 0% 0%,
+      color-mix(in srgb, var(--primary) 14%, transparent),
+      transparent 55%
+    ),
+    var(--card);
+  box-shadow: var(--shadow-card);
+  padding: 1.35rem 1.4rem;
+}
+
+.dark .settings-about-hero {
+  background:
+    radial-gradient(
+      120% 80% at 0% 0%,
+      color-mix(in srgb, var(--primary) 20%, transparent),
+      transparent 55%
+    ),
+    var(--card);
+}
+
+.settings-about-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.settings-about-logo {
+  width: 4.5rem;
+  height: 4.5rem;
+  flex-shrink: 0;
+  border-radius: 1.15rem;
+  box-shadow: var(--shadow-card);
+}
+
+.settings-link-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 0;
+  background: transparent;
+  padding: 0.9rem 1rem;
+  text-align: left;
+  color: inherit;
+  transition: background-color var(--motion-duration-color) var(--motion-ease-out);
+}
+
+.settings-link-row + .settings-link-row {
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.settings-link-row:hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.settings-link-row:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.settings-link-row-meta {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted-foreground);
+}
+
+.settings-update-progress {
+  height: 0.25rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.settings-update-progress-bar {
+  height: 100%;
+  background: var(--primary);
+  transition: width var(--motion-duration-panel) var(--motion-ease-out);
+}
+
+.settings-update-banner {
+  border-top: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.settings-update-banner--error {
+  border-top-color: color-mix(in srgb, var(--destructive) 30%, transparent);
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+}
+
+/* Mobile / narrow: horizontal pill nav instead of sidebar */
+.settings-mobile-nav {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  margin-bottom: 1.25rem;
+  border-radius: 0.625rem;
+  background: color-mix(in srgb, var(--muted) 55%, var(--card));
+  padding: 0.25rem;
+}
+
+.settings-mobile-tab {
+  flex: 1 1 0;
+  min-width: 4.25rem;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  transition:
+    color var(--motion-duration-color) var(--motion-ease-out),
+    background-color var(--motion-duration-color) var(--motion-ease-out),
+    box-shadow var(--motion-duration-color) var(--motion-ease-out);
+}
+
+.settings-mobile-tab:hover:not([data-active="true"]) {
+  color: var(--foreground);
+}
+
+.settings-mobile-tab[data-active="true"] {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--shadow-segment);
+}
+
+@media (min-width: 720px) {
+  .settings-sidebar {
+    display: block;
+  }
+
+  .settings-body {
+    padding: 1.5rem 1.75rem 2.25rem;
+  }
+
+  .settings-mobile-nav {
+    display: none;
+  }
+
+  .settings-field-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+  }
+
+  .settings-field-row-label {
+    flex: 1 1 auto;
+  }
+
+  .settings-field-row-control {
+    flex: 0 0 auto;
+    width: min(100%, 18rem);
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .settings-field-row--stack {
+    align-items: flex-start;
+  }
+}
+
+.settings-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.settings-header button,
+.settings-header [data-slot="button"],
+.settings-page-header button,
+.settings-page-header [data-slot="button"] {
   app-region: no-drag;
   -webkit-app-region: no-drag;
 }
@@ -393,12 +856,6 @@
 
 .settings-group-row--action:focus-visible {
   outline: none;
-}
-
-/* Settings body — scroll without a visible scrollbar (global hide above) */
-.settings-body {
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
 [data-slot="dialog-content"].giter-dialog {

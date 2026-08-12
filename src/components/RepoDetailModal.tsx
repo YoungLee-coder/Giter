@@ -132,7 +132,7 @@ export function RepoDetailModal({ repo, onClose }: Props) {
       setPublishInfo(info);
     } catch (e) {
       if (seq !== publishInfoSeq.current) return;
-      setPublishInfo({ available: false, login: null });
+      setPublishInfo({ available: false, login: null, gitProtocol: null });
       setError(String(e));
     } finally {
       if (seq === publishInfoSeq.current) setPublishInfoLoading(false);

@@ -3,11 +3,13 @@ mod git;
 mod scan;
 mod settings;
 mod store;
+mod window_chrome;
 
 #[cfg(target_os = "macos")]
 mod menu;
 
 use commands::AppState;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -31,12 +33,17 @@ pub fn run() {
             commands::repo_detail,
             commands::add_remote,
             commands::github_publish_info,
+            commands::start_github_login,
+            commands::sync_git_identity_from_github,
             commands::publish_to_github,
             commands::set_settings_menu_label,
             commands::get_settings,
             commands::update_settings,
             commands::get_app_info,
             commands::get_git_info,
+            commands::set_git_identity_field,
+            window_chrome::sync_window_chrome,
+            window_chrome::system_prefers_dark,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -50,6 +57,18 @@ pub fn run() {
                     }
                 });
             }
+
+            // Paint Windows title bar to match canvas before webview hydrates.
+            if let Some(window) = app.get_webview_window("main") {
+                let dark = match settings::load(app.handle()).ok().as_ref().map(|s| s.theme.as_str()) {
+                    Some("dark") => true,
+                    Some("light") => false,
+                    // "system" / unknown: follow OS apps theme (not WebView scheme).
+                    _ => window_chrome::os_prefers_dark(),
+                };
+                window_chrome::apply_window_chrome(&window, dark);
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())

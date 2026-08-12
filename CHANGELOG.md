@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-12
+
+### Added
+
+- Full-page settings view replacing the modal, with General, Scanning, Git, and About tabs
+- Windows 11 native title bar theming synced with app light/dark mode
+- Git info section in settings (version, user, protocol, publish status)
+- Async `spawn_blocking` wrappers for git and store commands to keep the UI responsive
+
+### Changed
+
+- Theme resolution uses OS dark-mode detection on Windows instead of WebView2 `prefers-color-scheme`
+- Upgrade framer-motion, i18next, vitest, and other dependencies
+- Release CI pins Node 24 and pnpm/action-setup v5
+
 ## [0.3.0] - 2026-08-11
 
 ### Added

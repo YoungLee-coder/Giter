@@ -1,6 +1,186 @@
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// Suppress transient console windows when spawning git/gh from a GUI process.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+#[cfg(windows)]
+fn command_in_path(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    augment_windows_path(&mut cmd);
+    cmd
+}
+
+#[cfg(not(windows))]
+fn command_in_path(program: &str) -> Command {
+    Command::new(program)
+}
+
+/// GUI apps on Windows often inherit a stale/reduced PATH (e.g. after installing
+/// Git or GitHub CLI without restarting the app).
+#[cfg(windows)]
+fn augment_windows_path(cmd: &mut Command) {
+    let Ok(path) = std::env::var("PATH") else {
+        return;
+    };
+
+    let mut prefix = String::new();
+    for dir in windows_tool_dirs() {
+        let dir_str = dir.to_string_lossy();
+        if dir.is_dir() && !path_contains_dir(&path, &dir_str) {
+            if !prefix.is_empty() {
+                prefix.push(';');
+            }
+            prefix.push_str(&dir_str);
+        }
+    }
+
+    if prefix.is_empty() {
+        return;
+    }
+
+    let _ = cmd.env("PATH", format!("{prefix};{path}"));
+}
+
+#[cfg(windows)]
+fn path_contains_dir(path: &str, dir: &str) -> bool {
+    path.split(';')
+        .any(|entry| entry.eq_ignore_ascii_case(dir))
+}
+
+#[cfg(windows)]
+fn windows_tool_dirs() -> Vec<PathBuf> {
+    let mut dirs = vec![
+        PathBuf::from(r"C:\Program Files\Git\cmd"),
+        PathBuf::from(r"C:\Program Files (x86)\Git\cmd"),
+        PathBuf::from(r"C:\Program Files\GitHub CLI"),
+        PathBuf::from(r"C:\Program Files (x86)\GitHub CLI"),
+    ];
+
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        dirs.push(PathBuf::from(&local).join("GitHub CLI"));
+        dirs.push(PathBuf::from(&local).join(r"Programs\GitHub CLI"));
+    }
+    if let Ok(pf) = std::env::var("ProgramFiles") {
+        let candidate = PathBuf::from(&pf).join("GitHub CLI");
+        if !dirs.iter().any(|d| d == &candidate) {
+            dirs.push(candidate);
+        }
+    }
+    if let Ok(pf86) = std::env::var("ProgramFiles(x86)") {
+        let candidate = PathBuf::from(pf86).join("GitHub CLI");
+        if !dirs.iter().any(|d| d == &candidate) {
+            dirs.push(candidate);
+        }
+    }
+
+    dirs
+}
+
+fn git_command() -> Command {
+    command_in_path("git")
+}
+
+fn gh_command() -> Command {
+    if let Some(exe) = resolved_gh_exe() {
+        #[cfg(windows)]
+        {
+            let mut cmd = Command::new(exe);
+            cmd.creation_flags(CREATE_NO_WINDOW);
+            return cmd;
+        }
+        #[cfg(not(windows))]
+        {
+            return Command::new(exe);
+        }
+    }
+    command_in_path("gh")
+}
+
+/// Absolute path to `gh` when resolved from PATH or known install locations.
+fn resolved_gh_exe() -> Option<&'static Path> {
+    static GH_EXE: OnceLock<Option<PathBuf>> = OnceLock::new();
+    GH_EXE
+        .get_or_init(find_gh_exe)
+        .as_ref()
+        .map(|p| p.as_path())
+}
+
+fn find_gh_exe() -> Option<PathBuf> {
+    if let Some(path) = which_program("gh") {
+        return Some(path);
+    }
+
+    #[cfg(windows)]
+    {
+        for dir in windows_tool_dirs() {
+            let candidate = dir.join("gh.exe");
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        const CANDIDATES: &[&str] = &[
+            "/opt/homebrew/bin/gh",
+            "/usr/local/bin/gh",
+            "/usr/bin/gh",
+        ];
+        for candidate in CANDIDATES {
+            let path = PathBuf::from(candidate);
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+
+    None
+}
+
+fn which_program(program: &str) -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        let output = where_command().arg(program).output().ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let text = String::from_utf8_lossy(&output.stdout);
+        let first = text.lines().next()?.trim();
+        if first.is_empty() {
+            return None;
+        }
+        let path = PathBuf::from(first);
+        path.is_file().then_some(path)
+    }
+
+    #[cfg(not(windows))]
+    {
+        let output = Command::new("which").arg(program).output().ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let text = String::from_utf8_lossy(&output.stdout);
+        let first = text.lines().next()?.trim();
+        if first.is_empty() {
+            return None;
+        }
+        let path = PathBuf::from(first);
+        path.is_file().then_some(path)
+    }
+}
+
+fn where_command() -> Command {
+    command_in_path("where")
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,7 +247,7 @@ pub struct RepoDetail {
 }
 
 pub fn git_available() -> bool {
-    Command::new("git")
+    git_command()
         .arg("--version")
         .output()
         .map(|o| o.status.success())
@@ -86,7 +266,7 @@ pub struct GitInfo {
 }
 
 pub fn git_info() -> GitInfo {
-    let version_output = Command::new("git").arg("--version").output().ok();
+    let version_output = git_command().arg("--version").output().ok();
     let available = version_output
         .as_ref()
         .map(|o| o.status.success())
@@ -124,7 +304,7 @@ pub fn git_info() -> GitInfo {
 }
 
 fn run_git_global(args: &[&str]) -> Option<String> {
-    let output = Command::new("git").args(args).output().ok()?;
+    let output = git_command().args(args).output().ok()?;
     if !output.status.success() {
         return None;
     }
@@ -137,10 +317,54 @@ fn run_git_global(args: &[&str]) -> Option<String> {
     }
 }
 
+fn set_git_global(key: &str, value: &str) -> Result<(), String> {
+    let output = git_command()
+        .args(["config", "--global", key, value])
+        .output()
+        .map_err(|e| format!("Failed to set {key}: {e}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Err(if stderr.is_empty() {
+            format!("Failed to set {key}")
+        } else {
+            stderr
+        })
+    }
+}
+
+/// Set global `user.name` or `user.email`.
+pub fn set_git_identity_field(field: &str, value: &str) -> Result<GitInfo, String> {
+    if !git_available() {
+        return Err("Git was not found in PATH".into());
+    }
+
+    let key = match field.trim() {
+        "user.name" | "name" => "user.name",
+        "user.email" | "email" => "user.email",
+        _ => return Err("Field must be user.name or user.email".into()),
+    };
+
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(format!("{key} cannot be empty"));
+    }
+    if key == "user.email" && !value.contains('@') {
+        return Err("user.email must look like an email address".into());
+    }
+    if value.chars().any(|c| c == '\n' || c == '\r' || c == '\0') {
+        return Err(format!("{key} contains invalid characters"));
+    }
+
+    set_git_global(key, value)?;
+    Ok(git_info())
+}
+
 fn resolve_git_path() -> Option<String> {
     #[cfg(windows)]
     {
-        let output = Command::new("where").arg("git").output().ok()?;
+        let output = where_command().arg("git").output().ok()?;
         if !output.status.success() {
             return None;
         }
@@ -167,7 +391,7 @@ fn resolve_git_path() -> Option<String> {
 }
 
 fn run_git(cwd: &str, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
+    let output = git_command()
         .args(args)
         .current_dir(cwd)
         .output()
@@ -331,6 +555,8 @@ pub fn add_remote(path: &str, name: &str, url: &str) -> Result<RepoDetail, Strin
 pub struct GithubPublishInfo {
     pub available: bool,
     pub login: Option<String>,
+    /// Preferred git protocol for github.com: `https` or `ssh`.
+    pub git_protocol: Option<String>,
 }
 
 pub fn github_publish_info() -> GithubPublishInfo {
@@ -338,12 +564,213 @@ pub fn github_publish_info() -> GithubPublishInfo {
         return GithubPublishInfo {
             available: false,
             login: None,
+            git_protocol: None,
         };
     }
+    let login = run_gh_global(&["api", "user", "-q", ".login"]);
+    let git_protocol = login
+        .as_ref()
+        .and_then(|_| run_gh_global(&["config", "get", "-h", "github.com", "git_protocol"]))
+        .map(|p| p.to_ascii_lowercase());
     GithubPublishInfo {
         available: true,
-        login: run_gh_global(&["api", "user", "-q", ".login"]),
+        login,
+        git_protocol,
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitIdentitySync {
+    pub user_name: Option<String>,
+    pub user_email: Option<String>,
+    pub name_updated: bool,
+    pub email_updated: bool,
+}
+
+/// Apply GitHub account profile to global `user.name` / `user.email`.
+/// When `overwrite` is false, only empty values are filled.
+pub fn sync_git_identity_from_github(overwrite: bool) -> Result<GitIdentitySync, String> {
+    if !git_available() {
+        return Err("Git was not found in PATH".into());
+    }
+    if !gh_available() {
+        return Err(
+            "GitHub CLI (gh) was not found in PATH. Install it from https://cli.github.com/".into(),
+        );
+    }
+
+    let login = run_gh_global(&["api", "user", "-q", ".login"])
+        .ok_or_else(|| "Not signed in to GitHub CLI. Run gh auth login first.".to_string())?;
+
+    let existing_name = run_git_global(&["config", "--global", "--get", "user.name"]);
+    let existing_email = run_git_global(&["config", "--global", "--get", "user.email"]);
+
+    let github_name = run_gh_global(&["api", "user", "-q", ".name"])
+        .filter(|s| !s.is_empty() && s != "null")
+        .unwrap_or_else(|| login.clone());
+    let github_email = github_account_email(&login)?;
+
+    let mut name_updated = false;
+    let mut email_updated = false;
+    let mut user_name = existing_name.clone();
+    let mut user_email = existing_email.clone();
+
+    if overwrite || existing_name.is_none() {
+        if existing_name.as_deref() != Some(github_name.as_str()) {
+            set_git_global("user.name", &github_name)?;
+            name_updated = true;
+        }
+        user_name = Some(github_name);
+    }
+
+    if overwrite || existing_email.is_none() {
+        if existing_email.as_deref() != Some(github_email.as_str()) {
+            set_git_global("user.email", &github_email)?;
+            email_updated = true;
+        }
+        user_email = Some(github_email);
+    }
+
+    Ok(GitIdentitySync {
+        user_name,
+        user_email,
+        name_updated,
+        email_updated,
+    })
+}
+
+fn github_account_email(login: &str) -> Result<String, String> {
+    if let Some(email) = run_gh_global(&["api", "user", "-q", ".email"])
+        .filter(|s| !s.is_empty() && s != "null" && s.contains('@'))
+    {
+        return Ok(email);
+    }
+
+    if let Some(email) = run_gh_global(&[
+        "api",
+        "user/emails",
+        "-q",
+        ".[] | select(.primary == true) | .email",
+    ])
+    .filter(|s| !s.is_empty() && s.contains('@'))
+    {
+        return Ok(email);
+    }
+
+    if let Some(email) = run_gh_global(&[
+        "api",
+        "user/emails",
+        "-q",
+        ".[] | select(.verified == true) | .email",
+    ])
+    .filter(|s| !s.is_empty() && s.contains('@'))
+    {
+        return Ok(email);
+    }
+
+    // Private email / missing user scope: stable GitHub noreply address.
+    if let Some(id) = run_gh_global(&["api", "user", "-q", ".id"]).filter(|s| {
+        !s.is_empty() && s != "null" && s.chars().all(|c| c.is_ascii_digit())
+    }) {
+        return Ok(format!("{id}+{login}@users.noreply.github.com"));
+    }
+
+    Ok(format!("{login}@users.noreply.github.com"))
+}
+
+/// Opens a system terminal so the user can complete `gh auth login --web`.
+/// `protocol` must be `https` or `ssh`. The one-time device code must be visible,
+/// so this cannot run headless.
+pub fn start_github_login(protocol: &str) -> Result<(), String> {
+    if !gh_available() {
+        return Err(
+            "GitHub CLI (gh) was not found in PATH. Install it from https://cli.github.com/".into(),
+        );
+    }
+
+    let protocol = protocol.trim().to_ascii_lowercase();
+    if protocol != "https" && protocol != "ssh" {
+        return Err("Protocol must be https or ssh".into());
+    }
+
+    #[cfg(windows)]
+    {
+        return open_windows_gh_login(&protocol);
+    }
+
+    #[cfg(not(windows))]
+    {
+        let gh = resolved_gh_exe()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "gh".into());
+        let login = format!("{gh} auth login --web -h github.com -p {protocol}");
+        open_login_terminal(&login)
+    }
+}
+
+/// Windows `cmd /K` + `CreateProcess` quoting breaks nested quotes around paths
+/// with spaces. Pass one raw `/C` string using cmd's `""exe" args"` convention.
+#[cfg(windows)]
+fn open_windows_gh_login(protocol: &str) -> Result<(), String> {
+    let gh = resolved_gh_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "gh".into());
+
+    // cmd /K ""C:\Program Files\GitHub CLI\gh.exe" auth login ..."
+    let cmdline = format!(
+        "/C start \"Giter GitHub Login\" cmd /K \"\"{gh}\" auth login --web -h github.com -p {protocol}\""
+    );
+
+    let mut cmd = Command::new("cmd");
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd.raw_arg(cmdline);
+    cmd.spawn()
+        .map_err(|e| format!("Failed to open login terminal: {e}"))?;
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn open_login_terminal(login: &str) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            "tell application \"Terminal\" to do script \"{}\"",
+            login.replace('\\', "\\\\").replace('"', "\\\"")
+        );
+        Command::new("osascript")
+            .args(["-e", &script])
+            .spawn()
+            .map_err(|e| format!("Failed to open Terminal: {e}"))?;
+        return Ok(());
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let shell_cmd = format!("{login}; echo; read -r -p 'Press Enter to close…'");
+        let candidates: &[(&str, &[&str])] = &[
+            ("x-terminal-emulator", &["-e", "bash", "-lc"]),
+            ("gnome-terminal", &["--", "bash", "-lc"]),
+            ("konsole", &["-e", "bash", "-lc"]),
+            ("xfce4-terminal", &["-e", "bash", "-lc"]),
+            ("xterm", &["-e", "bash", "-lc"]),
+        ];
+
+        for (program, prefix) in candidates {
+            let mut cmd = Command::new(program);
+            cmd.args(*prefix).arg(&shell_cmd);
+            if cmd.spawn().is_ok() {
+                return Ok(());
+            }
+        }
+
+        return Err(format!(
+            "Could not open a terminal. Run this manually: {login}"
+        ));
+    }
+
+    #[allow(unreachable_code)]
+    Err(format!("Unsupported platform. Run this manually: {login}"))
 }
 
 pub fn publish_to_github(path: &str, name: &str, private: bool) -> Result<RepoDetail, String> {
@@ -384,7 +811,7 @@ pub fn publish_to_github(path: &str, name: &str, private: bool) -> Result<RepoDe
 }
 
 fn gh_available() -> bool {
-    Command::new("gh")
+    gh_command()
         .arg("--version")
         .output()
         .map(|o| o.status.success())
@@ -392,7 +819,7 @@ fn gh_available() -> bool {
 }
 
 fn run_gh_global(args: &[&str]) -> Option<String> {
-    let output = Command::new("gh").args(args).output().ok()?;
+    let output = gh_command().args(args).output().ok()?;
     if !output.status.success() {
         return None;
     }
@@ -406,7 +833,7 @@ fn run_gh_global(args: &[&str]) -> Option<String> {
 }
 
 fn run_gh(cwd: &str, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("gh")
+    let output = gh_command()
         .args(args)
         .current_dir(cwd)
         .output()

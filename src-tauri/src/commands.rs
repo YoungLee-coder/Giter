@@ -21,6 +21,16 @@ impl Default for AppState {
     }
 }
 
+async fn run_blocking<T, F>(label: &str, f: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(f)
+        .await
+        .map_err(|e| format!("{label} join error: {e}"))?
+}
+
 async fn status_many(app: &AppHandle, paths: Vec<String>) -> Result<Vec<RepoStatus>, String> {
     if paths.is_empty() {
         return Ok(Vec::new());
@@ -64,8 +74,10 @@ async fn status_many(app: &AppHandle, paths: Vec<String>) -> Result<Vec<RepoStat
 }
 
 #[tauri::command]
-pub fn check_git() -> bool {
-    git::git_available()
+pub async fn check_git() -> bool {
+    tokio::task::spawn_blocking(git::git_available)
+        .await
+        .unwrap_or(false)
 }
 
 #[tauri::command]
@@ -82,57 +94,66 @@ pub async fn list_repos(app: AppHandle) -> Result<Vec<RepoStatus>, String> {
 }
 
 #[tauri::command]
-pub fn add_repo(app: AppHandle, path: String) -> Result<RepoStatus, String> {
-    let path = store::normalize_path(&path)?;
-    if !store::is_git_repo(&path) {
-        return Err(format!("Not a git repository: {path}"));
-    }
-
-    let mut store = store::load(&app)?;
-    if store.repos.iter().any(|r| r.path == path) {
-        return Ok(git::status(&path));
-    }
-    store.repos.push(RepoEntry { path: path.clone() });
-    store::save(&app, &store)?;
-    Ok(git::status(&path))
-}
-
-#[tauri::command]
-pub fn remove_repo(app: AppHandle, path: String) -> Result<(), String> {
-    remove_repos(app, vec![path])
-}
-
-#[tauri::command]
-pub fn remove_repos(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
-    if paths.is_empty() {
-        return Ok(());
-    }
-    let remove: HashSet<String> = paths.into_iter().collect();
-    let mut store = store::load(&app)?;
-    store.repos.retain(|r| !remove.contains(&r.path));
-    store::save(&app, &store)
-}
-
-#[tauri::command]
-pub fn reorder_repos(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
-    let mut store = store::load(&app)?;
-    if paths.len() != store.repos.len() {
-        return Err("Path count mismatch".into());
-    }
-
-    let existing: HashSet<String> = store.repos.iter().map(|r| r.path.clone()).collect();
-    let mut seen = HashSet::new();
-    for path in &paths {
-        if !existing.contains(path) {
-            return Err(format!("Unknown path: {path}"));
+pub async fn add_repo(app: AppHandle, path: String) -> Result<RepoStatus, String> {
+    run_blocking("add_repo", move || {
+        let path = store::normalize_path(&path)?;
+        if !store::is_git_repo(&path) {
+            return Err(format!("Not a git repository: {path}"));
         }
-        if !seen.insert(path.clone()) {
-            return Err(format!("Duplicate path: {path}"));
-        }
-    }
 
-    store.repos = paths.into_iter().map(|path| RepoEntry { path }).collect();
-    store::save(&app, &store)
+        let mut store = store::load(&app)?;
+        if store.repos.iter().any(|r| r.path == path) {
+            return Ok(git::status(&path));
+        }
+        store.repos.push(RepoEntry { path: path.clone() });
+        store::save(&app, &store)?;
+        Ok(git::status(&path))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn remove_repo(app: AppHandle, path: String) -> Result<(), String> {
+    remove_repos(app, vec![path]).await
+}
+
+#[tauri::command]
+pub async fn remove_repos(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    run_blocking("remove_repos", move || {
+        if paths.is_empty() {
+            return Ok(());
+        }
+        let remove: HashSet<String> = paths.into_iter().collect();
+        let mut store = store::load(&app)?;
+        store.repos.retain(|r| !remove.contains(&r.path));
+        store::save(&app, &store)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn reorder_repos(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    run_blocking("reorder_repos", move || {
+        let mut store = store::load(&app)?;
+        if paths.len() != store.repos.len() {
+            return Err("Path count mismatch".into());
+        }
+
+        let existing: HashSet<String> = store.repos.iter().map(|r| r.path.clone()).collect();
+        let mut seen = HashSet::new();
+        for path in &paths {
+            if !existing.contains(path) {
+                return Err(format!("Unknown path: {path}"));
+            }
+            if !seen.insert(path.clone()) {
+                return Err(format!("Duplicate path: {path}"));
+            }
+        }
+
+        store.repos = paths.into_iter().map(|path| RepoEntry { path }).collect();
+        store::save(&app, &store)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -424,18 +445,41 @@ async fn run_batch(
 }
 
 #[tauri::command]
-pub fn repo_detail(path: String) -> Result<RepoDetail, String> {
-    git::detail(&path)
+pub async fn repo_detail(path: String) -> Result<RepoDetail, String> {
+    run_blocking("repo_detail", move || git::detail(&path)).await
 }
 
 #[tauri::command]
-pub fn add_remote(path: String, name: String, url: String) -> Result<RepoDetail, String> {
-    git::add_remote(&path, &name, &url)
+pub async fn add_remote(path: String, name: String, url: String) -> Result<RepoDetail, String> {
+    run_blocking("add_remote", move || git::add_remote(&path, &name, &url)).await
 }
 
 #[tauri::command]
-pub fn github_publish_info() -> GithubPublishInfo {
-    git::github_publish_info()
+pub async fn github_publish_info() -> GithubPublishInfo {
+    tokio::task::spawn_blocking(git::github_publish_info)
+        .await
+        .unwrap_or(GithubPublishInfo {
+            available: false,
+            login: None,
+            git_protocol: None,
+        })
+}
+
+#[tauri::command]
+pub async fn start_github_login(protocol: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || git::start_github_login(&protocol))
+        .await
+        .map_err(|e| format!("start_github_login join error: {e}"))?
+}
+
+#[tauri::command]
+pub async fn sync_git_identity_from_github(
+    overwrite: Option<bool>,
+) -> Result<git::GitIdentitySync, String> {
+    let overwrite = overwrite.unwrap_or(false);
+    tokio::task::spawn_blocking(move || git::sync_git_identity_from_github(overwrite))
+        .await
+        .map_err(|e| format!("sync_git_identity_from_github join error: {e}"))?
 }
 
 #[tauri::command]
@@ -463,27 +507,54 @@ pub fn set_settings_menu_label(app: AppHandle, label: String) -> Result<(), Stri
 }
 
 #[tauri::command]
-pub fn get_settings(app: AppHandle) -> Result<AppSettings, String> {
-    settings::load(&app)
+pub async fn get_settings(app: AppHandle) -> Result<AppSettings, String> {
+    run_blocking("get_settings", move || settings::load(&app)).await
 }
 
 #[tauri::command]
-pub fn update_settings(app: AppHandle, settings: AppSettings) -> Result<AppSettings, String> {
-    let sanitized = settings.sanitize();
-    settings::save(&app, &sanitized)?;
-    Ok(sanitized)
+pub async fn update_settings(
+    app: AppHandle,
+    next: AppSettings,
+) -> Result<AppSettings, String> {
+    run_blocking("update_settings", move || {
+        let sanitized = next.sanitize();
+        settings::save(&app, &sanitized)?;
+        Ok(sanitized)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn get_app_info(app: AppHandle) -> Result<AppInfo, String> {
+pub async fn get_app_info(app: AppHandle) -> Result<AppInfo, String> {
+    let name = app.package_info().name.clone();
+    let version = app.package_info().version.to_string();
+    let git_available = tokio::task::spawn_blocking(git::git_available)
+        .await
+        .unwrap_or(false);
     Ok(AppInfo {
-        name: app.package_info().name.clone(),
-        version: app.package_info().version.to_string(),
-        git_available: git::git_available(),
+        name,
+        version,
+        git_available,
     })
 }
 
 #[tauri::command]
-pub fn get_git_info() -> git::GitInfo {
-    git::git_info()
+pub async fn get_git_info() -> git::GitInfo {
+    tokio::task::spawn_blocking(git::git_info)
+        .await
+        .unwrap_or(git::GitInfo {
+            available: false,
+            version: None,
+            path: None,
+            exec_path: None,
+            user_name: None,
+            user_email: None,
+        })
+}
+
+#[tauri::command]
+pub async fn set_git_identity_field(field: String, value: String) -> Result<git::GitInfo, String> {
+    tokio::task::spawn_blocking(move || git::set_git_identity_field(&field, &value))
+        .await
+        .map_err(|e| format!("set_git_identity_field join error: {e}"))?
 }

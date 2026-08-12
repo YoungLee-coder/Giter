@@ -21,6 +21,13 @@ export const fadeFast = {
   transition: { duration: 0.15 } satisfies Transition,
 } as const;
 
+/** Settings tab panel enter (cc-switch SettingsPage TabsContent). */
+export const settingsTabContent = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.3 } satisfies Transition,
+} as const;
+
 /** Collapse / expand panels (ProxyPanel, WindowSettings). */
 export const collapse = {
   initial: { opacity: 0, height: 0 },

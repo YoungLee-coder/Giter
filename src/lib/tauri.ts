@@ -75,9 +75,19 @@ export type GitInfo = {
   userEmail: string | null;
 };
 
+export type GithubProtocol = "https" | "ssh";
+
 export type GithubPublishInfo = {
   available: boolean;
   login: string | null;
+  gitProtocol: GithubProtocol | string | null;
+};
+
+export type GitIdentitySync = {
+  userName: string | null;
+  userEmail: string | null;
+  nameUpdated: boolean;
+  emailUpdated: boolean;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -106,6 +116,10 @@ export const api = {
   addRemote: (path: string, name: string, url: string) =>
     invoke<RepoDetail>("add_remote", { path, name, url }),
   githubPublishInfo: () => invoke<GithubPublishInfo>("github_publish_info"),
+  startGithubLogin: (protocol: GithubProtocol = "https") =>
+    invoke<void>("start_github_login", { protocol }),
+  syncGitIdentityFromGithub: (overwrite = false) =>
+    invoke<GitIdentitySync>("sync_git_identity_from_github", { overwrite }),
   publishToGithub: (path: string, name: string, privateRepo: boolean) =>
     invoke<RepoDetail>("publish_to_github", {
       path,
@@ -119,4 +133,6 @@ export const api = {
     invoke<AppSettings>("update_settings", { settings }),
   getAppInfo: () => invoke<AppInfo>("get_app_info"),
   getGitInfo: () => invoke<GitInfo>("get_git_info"),
+  setGitIdentityField: (field: "user.name" | "user.email", value: string) =>
+    invoke<GitInfo>("set_git_identity_field", { field, value }),
 };

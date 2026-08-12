@@ -1,7 +1,9 @@
-import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, type CSSProperties } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { listen } from "@tauri-apps/api/event";
 import {
   AlertCircleIcon,
+  ArrowLeftIcon,
   ArrowUpCircleIcon,
   CircleAlertIcon,
   InfoIcon,
@@ -30,6 +32,7 @@ import {
 } from "@/hooks/useRepos";
 import { useSettings } from "@/hooks/useSettings";
 import { APP_NAME } from "@/lib/app";
+import { fadePage } from "@/lib/motion";
 import { queueProgress } from "@/lib/progressBus";
 import {
   DRAG_REGION_ATTR,
@@ -50,15 +53,17 @@ import {
 import { cn } from "@/lib/utils";
 import "./App.css";
 
-const SettingsModal = lazy(() =>
-  import("@/components/SettingsModal").then((m) => ({ default: m.SettingsModal })),
+const SettingsPage = lazy(() =>
+  import("@/components/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
 
 const DEFAULT_DRAG_BAR_HEIGHT = getDragBarHeight();
 const HEADER_HEIGHT = 48;
 
 function App() {
-  const { isMac, setSettingsOpen, setAvailableUpdate } = useAppUi();
+  const { isMac, settingsOpen, setSettingsOpen, setAvailableUpdate } = useAppUi();
+  const reduceMotion = useReducedMotion();
+  const pageTransition = reduceMotion ? { duration: 0 } : fadePage.transition;
   const dragBarHeight = DEFAULT_DRAG_BAR_HEIGHT;
   const contentTopOffset = dragBarHeight + HEADER_HEIGHT;
   const { t, locale } = useI18n();
@@ -141,11 +146,86 @@ function App() {
           aria-hidden="true"
         />
       )}
-      <AppHeader dragBarHeight={dragBarHeight} />
-      <AppBanners />
-      <AppMain />
+      {settingsOpen ? (
+        <AppSettingsHeader
+          dragBarHeight={dragBarHeight}
+          onBack={() => setSettingsOpen(false)}
+        />
+      ) : (
+        <AppHeader dragBarHeight={dragBarHeight} />
+      )}
+      <AnimatePresence mode="wait" initial={false}>
+        {settingsOpen ? (
+          <motion.div
+            key="settings"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            initial={reduceMotion ? false : fadePage.initial}
+            animate={fadePage.animate}
+            exit={reduceMotion ? undefined : fadePage.exit}
+            transition={pageTransition}
+          >
+            <Suspense fallback={null}>
+              <SettingsPage onBack={() => setSettingsOpen(false)} />
+            </Suspense>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="home"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            initial={reduceMotion ? false : fadePage.initial}
+            animate={fadePage.animate}
+            exit={reduceMotion ? undefined : fadePage.exit}
+            transition={pageTransition}
+          >
+            <AppBanners />
+            <AppMain />
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AppModals />
     </div>
+  );
+}
+
+function AppSettingsHeader({
+  dragBarHeight,
+  onBack,
+}: {
+  dragBarHeight: number;
+  onBack: () => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <header
+      className="app-header settings-page-header fixed z-50 w-full bg-background/80 backdrop-blur-md"
+      {...DRAG_REGION_ATTR}
+      style={
+        {
+          ...DRAG_REGION_STYLE,
+          top: dragBarHeight,
+          height: HEADER_HEIGHT,
+        } as CSSProperties
+      }
+    >
+      <div
+        className="flex h-full items-center gap-3 px-6"
+        style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
+      >
+        <button
+          type="button"
+          className="settings-back text-foreground transition-colors hover:bg-secondary"
+          aria-label={t("gitInfoBack")}
+          title={t("gitInfoBack")}
+          onClick={onBack}
+        >
+          <ArrowLeftIcon className="size-4" />
+        </button>
+        <h1 className="truncate text-xl font-semibold tracking-tight">
+          {t("settingsTitle")}
+        </h1>
+      </div>
+    </header>
   );
 }
 
@@ -464,28 +544,13 @@ function AppMain() {
 }
 
 function AppModals() {
-  const { settingsOpen, detailRepo, setSettingsOpen, setDetailRepo } = useAppUi();
-  const [settingsMounted, setSettingsMounted] = useState(false);
-
-  useEffect(() => {
-    if (settingsOpen) setSettingsMounted(true);
-  }, [settingsOpen]);
+  const { detailRepo, setDetailRepo } = useAppUi();
 
   return (
-    <>
-      {settingsMounted ? (
-        <Suspense fallback={null}>
-          <SettingsModal
-            open={settingsOpen}
-            onClose={() => setSettingsOpen(false)}
-          />
-        </Suspense>
-      ) : null}
-      <RepoDetailModal
-        repo={detailRepo}
-        onClose={() => setDetailRepo(null)}
-      />
-    </>
+    <RepoDetailModal
+      repo={detailRepo}
+      onClose={() => setDetailRepo(null)}
+    />
   );
 }
 
