@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+### Fixed
+
+- Settings → Theme stays on Light/Dark after you pick it (and other settings save again); `update_settings` IPC argument name matches the frontend payload
+
+### Changed
+
+- Follow the OS in Auto with `setTheme(null)` instead of forcing light/dark (drops the Windows registry theme watcher)
+
 ## [0.5.1] - 2026-08-13
 
 ### Changed

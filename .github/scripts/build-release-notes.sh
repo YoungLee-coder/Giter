@@ -46,14 +46,14 @@ echo "## What's Changed"
 echo
 printf '%s\n' "$NOTES"
 echo
-echo "### 下载地址："
+echo "### Downloads"
 echo
-echo "#### macOS 10.15+："
+echo "#### macOS 10.15+"
 echo
-echo "- DMG：[Apple Silicon]($(asset aarch64.dmg)) | [Intel]($(asset x64.dmg))"
+echo "- DMG: [Apple Silicon]($(asset aarch64.dmg)) | [Intel]($(asset x64.dmg))"
 echo
-echo "#### Windows："
+echo "#### Windows"
 echo
-echo "- 安装版：[NSIS]($(asset x64-setup.exe)) | [MSI]($(asset x64_en-US.msi))"
+echo "- Installer: [.exe]($(asset x64-setup.exe)) | [MSI]($(asset x64_en-US.msi))"
 echo
 echo "Unsigned builds: on macOS, right-click the app and choose Open the first time."

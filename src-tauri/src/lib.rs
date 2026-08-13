@@ -9,7 +9,7 @@ mod window_chrome;
 mod menu;
 
 use commands::AppState;
-use tauri::Manager;
+use tauri::{Manager, Theme};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -44,7 +44,6 @@ pub fn run() {
             commands::set_git_identity_field,
             commands::set_git_config_field,
             window_chrome::sync_window_chrome,
-            window_chrome::system_prefers_dark,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -59,22 +58,31 @@ pub fn run() {
                 });
             }
 
-            // Paint Windows title bar to match canvas before webview hydrates.
+            // Native theme + Windows caption before the webview hydrates.
+            // `None` keeps WebView2 PreferredColorScheme Auto so matchMedia follows OS.
             if let Some(window) = app.get_webview_window("main") {
-                let dark = match settings::load(app.handle())
+                match settings::load(app.handle())
                     .ok()
                     .as_ref()
                     .map(|s| s.theme.as_str())
                 {
-                    Some("dark") => true,
-                    Some("light") => false,
-                    // "system" / unknown: follow OS apps theme (not WebView scheme).
-                    _ => window_chrome::os_prefers_dark(),
-                };
-                window_chrome::apply_window_chrome(&window, dark);
+                    Some("dark") => {
+                        let _ = window.set_theme(Some(Theme::Dark));
+                        window_chrome::apply_window_chrome(&window, true);
+                    }
+                    Some("light") => {
+                        let _ = window.set_theme(Some(Theme::Light));
+                        window_chrome::apply_window_chrome(&window, false);
+                    }
+                    _ => {
+                        let _ = window.set_theme(None);
+                        window_chrome::apply_window_chrome(
+                            &window,
+                            window_chrome::os_prefers_dark(),
+                        );
+                    }
+                }
             }
-
-            window_chrome::start_os_theme_watch(app.handle().clone());
 
             Ok(())
         })

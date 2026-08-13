@@ -3,17 +3,11 @@
 //! `setTheme(Light)` alone still leaves the system caption tint (grey/blue).
 //! `DWMWA_CAPTION_COLOR` paints the title bar to match our white / dark canvas.
 //!
-//! Also exposes OS dark-mode detection that is independent of WebView2's
-//! `PreferredColorScheme` (which `Window.setTheme` mutates and can poison
-//! `prefers-color-scheme` / `matchMedia` on Windows).
+//! OS dark-mode detection (Windows `AppsUseLightTheme`) is only used at
+//! startup to paint caption before the webview hydrates. Runtime "system"
+//! theme uses `setTheme(null)` so `prefers-color-scheme` follows the OS.
 
-#![allow(dead_code)]
-
-#[cfg(not(windows))]
-use tauri::AppHandle;
 use tauri::WebviewWindow;
-#[cfg(windows)]
-use tauri::{AppHandle, Emitter};
 
 #[cfg(windows)]
 #[link(name = "dwmapi")]
@@ -38,21 +32,6 @@ unsafe extern "system" {
         pv_data: *mut core::ffi::c_void,
         pcb_data: *mut u32,
     ) -> i32;
-    fn RegOpenKeyExW(
-        hkey: isize,
-        lp_sub_key: *const u16,
-        ul_options: u32,
-        sam_desired: u32,
-        phk_result: *mut isize,
-    ) -> i32;
-    fn RegNotifyChangeKeyValue(
-        hkey: isize,
-        b_watch_subtree: i32,
-        dw_notify_filter: u32,
-        h_event: isize,
-        f_asynchronous: i32,
-    ) -> i32;
-    fn RegCloseKey(hkey: isize) -> i32;
 }
 
 #[cfg(windows)]
@@ -68,10 +47,6 @@ const DWMWA_TEXT_COLOR: u32 = 36;
 const HKEY_CURRENT_USER: isize = 0x80000001u32 as i32 as isize;
 #[cfg(windows)]
 const RRF_RT_REG_DWORD: u32 = 0x00000010;
-#[cfg(windows)]
-const KEY_NOTIFY: u32 = 0x0010;
-#[cfg(windows)]
-const REG_NOTIFY_CHANGE_LAST_SET: u32 = 0x00000004;
 #[cfg(windows)]
 const PERSONALIZE_SUBKEY: &str =
     "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize";
@@ -127,7 +102,7 @@ unsafe fn set_dwm_attr<T>(hwnd: isize, attr: u32, value: &T) {
 
 /// Whether the OS apps theme is dark (Windows: AppsUseLightTheme == 0).
 ///
-/// Independent of WebView2 PreferredColorScheme / `prefers-color-scheme`.
+/// Startup caption paint only. Runtime system theme uses `setTheme(null)`.
 pub fn os_prefers_dark() -> bool {
     #[cfg(windows)]
     {
@@ -168,63 +143,4 @@ fn apps_use_light_theme() -> Option<bool> {
 #[tauri::command]
 pub fn sync_window_chrome(window: WebviewWindow, dark: bool) {
     apply_window_chrome(&window, dark);
-}
-
-/// Frontend-facing: OS app dark mode (not WebView prefers-color-scheme).
-#[tauri::command]
-pub fn system_prefers_dark() -> bool {
-    #[cfg(windows)]
-    {
-        os_prefers_dark()
-    }
-    #[cfg(not(windows))]
-    {
-        // Non-Windows: frontend should use matchMedia; this is a harmless fallback.
-        false
-    }
-}
-
-/// Watch the Windows apps-theme registry key and emit `os-theme-changed`.
-/// Blocks on `RegNotifyChangeKeyValue` (no polling). No-op on other platforms.
-pub fn start_os_theme_watch(app: AppHandle) {
-    #[cfg(windows)]
-    {
-        std::thread::Builder::new()
-            .name("giter-os-theme".into())
-            .spawn(move || loop {
-                if !wait_personalize_key_change() {
-                    std::thread::sleep(std::time::Duration::from_secs(30));
-                    continue;
-                }
-                let _ = app.emit("os-theme-changed", os_prefers_dark());
-            })
-            .ok();
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = app;
-    }
-}
-
-#[cfg(windows)]
-fn wait_personalize_key_change() -> bool {
-    let sub_key: Vec<u16> = format!("{PERSONALIZE_SUBKEY}\0").encode_utf16().collect();
-    let mut hkey: isize = 0;
-    let open = unsafe {
-        RegOpenKeyExW(
-            HKEY_CURRENT_USER,
-            sub_key.as_ptr(),
-            0,
-            KEY_NOTIFY,
-            &mut hkey,
-        )
-    };
-    if open != 0 || hkey == 0 {
-        return false;
-    }
-    let status = unsafe { RegNotifyChangeKeyValue(hkey, 0, REG_NOTIFY_CHANGE_LAST_SET, 0, 0) };
-    unsafe {
-        let _ = RegCloseKey(hkey);
-    }
-    status == 0
 }

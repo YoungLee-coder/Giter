@@ -526,10 +526,10 @@ pub async fn get_settings(app: AppHandle) -> Result<AppSettings, String> {
 }
 
 #[tauri::command]
-pub async fn update_settings(app: AppHandle, next: AppSettings) -> Result<AppSettings, String> {
+pub async fn update_settings(app: AppHandle, settings: AppSettings) -> Result<AppSettings, String> {
     run_blocking("update_settings", move || {
-        let sanitized = next.sanitize();
-        settings::save(&app, &sanitized)?;
+        let sanitized = settings.sanitize();
+        crate::settings::save(&app, &sanitized)?;
         Ok(sanitized)
     })
     .await
