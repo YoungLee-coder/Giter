@@ -6,6 +6,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-13
+
+### Added
+
+- Commit graph in repo detail, with branch/tag/HEAD labels on recent history
+- Settings → Git: edit global defaults (`init.defaultBranch`, `core.autocrlf`, `fetch.prune`, `pull.ff`, `push.default`, `color.ui`) with visual legends
+- Apply GitHub name and email to local `user.name` / `user.email`
+- Shared AI project knowledge (`.ai/`) and agent entry files for Claude Code, Cursor, and opencode
+
+### Changed
+
+- Refresh shadcn/ui primitives and repo-detail / settings layout
+
 ## [0.4.0] - 2026-08-12
 
 ### Added

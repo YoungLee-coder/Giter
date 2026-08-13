@@ -51,8 +51,7 @@ fn augment_windows_path(cmd: &mut Command) {
 
 #[cfg(windows)]
 fn path_contains_dir(path: &str, dir: &str) -> bool {
-    path.split(';')
-        .any(|entry| entry.eq_ignore_ascii_case(dir))
+    path.split(';').any(|entry| entry.eq_ignore_ascii_case(dir))
 }
 
 #[cfg(windows)]
@@ -130,11 +129,7 @@ fn find_gh_exe() -> Option<PathBuf> {
 
     #[cfg(not(windows))]
     {
-        const CANDIDATES: &[&str] = &[
-            "/opt/homebrew/bin/gh",
-            "/usr/local/bin/gh",
-            "/usr/bin/gh",
-        ];
+        const CANDIDATES: &[&str] = &["/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"];
         for candidate in CANDIDATES {
             let path = PathBuf::from(candidate);
             if path.is_file() {
@@ -178,6 +173,7 @@ fn which_program(program: &str) -> Option<PathBuf> {
     }
 }
 
+#[cfg(windows)]
 fn where_command() -> Command {
     command_in_path("where")
 }
@@ -227,7 +223,15 @@ pub struct RemoteInfo {
     pub url: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitRef {
+    pub name: String,
+    /// "head" | "local" | "remote" | "tag"
+    pub kind: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommitInfo {
     pub hash: String,
@@ -235,6 +239,8 @@ pub struct CommitInfo {
     pub subject: String,
     pub author: String,
     pub date: String,
+    pub parents: Vec<String>,
+    pub refs: Vec<CommitRef>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -263,6 +269,31 @@ pub struct GitInfo {
     pub exec_path: Option<String>,
     pub user_name: Option<String>,
     pub user_email: Option<String>,
+    pub default_branch: Option<String>,
+    pub autocrlf: Option<String>,
+    pub fetch_prune: Option<bool>,
+    pub pull_ff: Option<String>,
+    pub push_default: Option<String>,
+    pub color_ui: Option<String>,
+}
+
+impl GitInfo {
+    pub fn unavailable() -> Self {
+        Self {
+            available: false,
+            version: None,
+            path: None,
+            exec_path: None,
+            user_name: None,
+            user_email: None,
+            default_branch: None,
+            autocrlf: None,
+            fetch_prune: None,
+            pull_ff: None,
+            push_default: None,
+            color_ui: None,
+        }
+    }
 }
 
 pub fn git_info() -> GitInfo {
@@ -273,14 +304,7 @@ pub fn git_info() -> GitInfo {
         .unwrap_or(false);
 
     if !available {
-        return GitInfo {
-            available: false,
-            version: None,
-            path: None,
-            exec_path: None,
-            user_name: None,
-            user_email: None,
-        };
+        return GitInfo::unavailable();
     }
 
     let version = version_output
@@ -290,8 +314,14 @@ pub fn git_info() -> GitInfo {
 
     let path = resolve_git_path();
     let exec_path = run_git_global(&["--exec-path"]);
-    let user_name = run_git_global(&["config", "--global", "--get", "user.name"]);
-    let user_email = run_git_global(&["config", "--global", "--get", "user.email"]);
+    let user_name = git_config_get("user.name");
+    let user_email = git_config_get("user.email");
+    let default_branch = git_config_get("init.defaultBranch");
+    let autocrlf = git_config_get_lower("core.autocrlf");
+    let fetch_prune = git_config_get("fetch.prune").and_then(|s| parse_git_bool(&s));
+    let pull_ff = git_config_get_lower("pull.ff");
+    let push_default = git_config_get_lower("push.default");
+    let color_ui = git_config_get_lower("color.ui");
 
     GitInfo {
         available: true,
@@ -300,6 +330,12 @@ pub fn git_info() -> GitInfo {
         exec_path,
         user_name,
         user_email,
+        default_branch,
+        autocrlf,
+        fetch_prune,
+        pull_ff,
+        push_default,
+        color_ui,
     }
 }
 
@@ -314,6 +350,94 @@ fn run_git_global(args: &[&str]) -> Option<String> {
         None
     } else {
         Some(trimmed.to_string())
+    }
+}
+
+fn git_config_get(key: &str) -> Option<String> {
+    run_git_global(&["config", "--global", "--get", key])
+}
+
+fn git_config_get_lower(key: &str) -> Option<String> {
+    git_config_get(key).map(|s| s.to_ascii_lowercase())
+}
+
+fn parse_git_bool(raw: &str) -> Option<bool> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "true" | "yes" | "on" | "1" => Some(true),
+        "false" | "no" | "off" | "0" => Some(false),
+        _ => None,
+    }
+}
+
+fn is_valid_default_branch(name: &str) -> bool {
+    if name.is_empty() || name.len() > 255 {
+        return false;
+    }
+    if name == "." || name == ".." || name.eq_ignore_ascii_case("HEAD") {
+        return false;
+    }
+    if name.starts_with('/') || name.starts_with('.') || name.starts_with('-') {
+        return false;
+    }
+    if name.ends_with('/') || name.ends_with('.') || name.ends_with(".lock") {
+        return false;
+    }
+    if name.contains("..") || name.contains("//") || name.contains("@{") {
+        return false;
+    }
+    !name.chars().any(|c| {
+        c.is_ascii_control()
+            || c.is_whitespace()
+            || matches!(c, '~' | '^' | ':' | '?' | '*' | '[' | '\\')
+    })
+}
+
+fn normalize_git_config_key(field: &str) -> Result<&'static str, String> {
+    match field.trim() {
+        "init.defaultBranch" => Ok("init.defaultBranch"),
+        "core.autocrlf" => Ok("core.autocrlf"),
+        "fetch.prune" => Ok("fetch.prune"),
+        "pull.ff" => Ok("pull.ff"),
+        "push.default" => Ok("push.default"),
+        "color.ui" => Ok("color.ui"),
+        _ => Err("Unsupported git config field".into()),
+    }
+}
+
+fn normalize_git_config_value(key: &str, value: &str) -> Result<String, String> {
+    let value = value.trim();
+    match key {
+        "init.defaultBranch" => {
+            if is_valid_default_branch(value) {
+                Ok(value.to_string())
+            } else {
+                Err("init.defaultBranch must be a valid branch name".into())
+            }
+        }
+        "core.autocrlf" => match value.to_ascii_lowercase().as_str() {
+            "true" | "false" | "input" => Ok(value.to_ascii_lowercase()),
+            _ => Err("core.autocrlf must be true, false, or input".into()),
+        },
+        "fetch.prune" => match parse_git_bool(value) {
+            Some(true) => Ok("true".into()),
+            Some(false) => Ok("false".into()),
+            None => Err("fetch.prune must be true or false".into()),
+        },
+        "pull.ff" => match value.to_ascii_lowercase().as_str() {
+            "true" | "false" | "only" => Ok(value.to_ascii_lowercase()),
+            _ => Err("pull.ff must be true, false, or only".into()),
+        },
+        "push.default" => match value.to_ascii_lowercase().as_str() {
+            "nothing" | "current" | "upstream" | "simple" | "matching" => {
+                Ok(value.to_ascii_lowercase())
+            }
+            _ => Err("push.default must be nothing, current, upstream, simple, or matching".into()),
+        },
+        "color.ui" => match value.to_ascii_lowercase().as_str() {
+            "true" | "false" | "auto" | "always" | "never" => Ok(value.to_ascii_lowercase()),
+            _ => Err("color.ui must be true, false, auto, always, or never".into()),
+        },
+        _ => Err("Unsupported git config field".into()),
     }
 }
 
@@ -332,6 +456,50 @@ fn set_git_global(key: &str, value: &str) -> Result<(), String> {
             stderr
         })
     }
+}
+
+fn unset_git_global(key: &str) -> Result<(), String> {
+    let output = git_command()
+        .args(["config", "--global", "--unset", key])
+        .output()
+        .map_err(|e| format!("Failed to unset {key}: {e}"))?;
+    if output.status.success() || output.status.code() == Some(5) {
+        return Ok(());
+    }
+    let retry = git_command()
+        .args(["config", "--global", "--unset-all", key])
+        .output()
+        .map_err(|e| format!("Failed to unset {key}: {e}"))?;
+    if retry.status.success() || retry.status.code() == Some(5) {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&retry.stderr).trim().to_string();
+    Err(if stderr.is_empty() {
+        format!("Failed to unset {key}")
+    } else {
+        stderr
+    })
+}
+
+/// Set or unset an allowlisted global git config key. Empty `value` unsets.
+pub fn set_git_config_field(field: &str, value: &str) -> Result<GitInfo, String> {
+    if !git_available() {
+        return Err("Git was not found in PATH".into());
+    }
+
+    let key = normalize_git_config_key(field)?;
+    let value = value.trim();
+    if value.chars().any(|c| c == '\n' || c == '\r' || c == '\0') {
+        return Err(format!("{key} contains invalid characters"));
+    }
+    if value.is_empty() {
+        unset_git_global(key)?;
+        return Ok(git_info());
+    }
+
+    let normalized = normalize_git_config_value(key, value)?;
+    set_git_global(key, &normalized)?;
+    Ok(git_info())
 }
 
 /// Set global `user.name` or `user.email`.
@@ -454,12 +622,7 @@ pub fn status(path: &str) -> RepoStatus {
     }
 }
 
-fn parse_status(
-    path: &str,
-    name: &str,
-    out: &str,
-    remote_provider: Option<String>,
-) -> RepoStatus {
+fn parse_status(path: &str, name: &str, out: &str, remote_provider: Option<String>) -> RepoStatus {
     let mut branch = None;
     let mut upstream = None;
     let mut ahead = 0u32;
@@ -511,7 +674,7 @@ pub fn detail(path: &str) -> Result<RepoDetail, String> {
     let (status, remotes, commits, changed_files) = std::thread::scope(|s| {
         let status_t = s.spawn(|| status(path));
         let remotes_t = s.spawn(|| list_remotes(path).unwrap_or_default());
-        let commits_t = s.spawn(|| list_commits(path, 12).unwrap_or_default());
+        let commits_t = s.spawn(|| list_commits(path, 20).unwrap_or_default());
         let files_t = s.spawn(|| list_changed_files(path, 30).unwrap_or_default());
         (
             status_t.join().unwrap_or_else(|_| status(path)),
@@ -670,9 +833,9 @@ fn github_account_email(login: &str) -> Result<String, String> {
     }
 
     // Private email / missing user scope: stable GitHub noreply address.
-    if let Some(id) = run_gh_global(&["api", "user", "-q", ".id"]).filter(|s| {
-        !s.is_empty() && s != "null" && s.chars().all(|c| c.is_ascii_digit())
-    }) {
+    if let Some(id) = run_gh_global(&["api", "user", "-q", ".id"])
+        .filter(|s| !s.is_empty() && s != "null" && s.chars().all(|c| c.is_ascii_digit()))
+    {
         return Ok(format!("{id}+{login}@users.noreply.github.com"));
     }
 
@@ -906,7 +1069,9 @@ fn provider_from_remote_url(url: &str) -> &'static str {
         "github"
     } else if host == "gitlab.com" || host.ends_with(".gitlab.com") || host.contains("gitlab") {
         "gitlab"
-    } else if host == "bitbucket.org" || host.ends_with(".bitbucket.org") || host.contains("bitbucket")
+    } else if host == "bitbucket.org"
+        || host.ends_with(".bitbucket.org")
+        || host.contains("bitbucket")
     {
         "bitbucket"
     } else if host == "codeberg.org" || host.ends_with(".codeberg.org") {
@@ -948,17 +1113,9 @@ fn remote_url_host(url: &str) -> Option<String> {
         url
     };
 
-    let without_auth = without_scheme
-        .rsplit('@')
-        .next()
-        .unwrap_or(without_scheme);
+    let without_auth = without_scheme.rsplit('@').next().unwrap_or(without_scheme);
 
-    let host = without_auth
-        .split('/')
-        .next()?
-        .split(':')
-        .next()?
-        .trim();
+    let host = without_auth.split('/').next()?.split(':').next()?.trim();
 
     if host.is_empty() {
         None
@@ -972,29 +1129,104 @@ fn list_commits(path: &str, limit: usize) -> Result<Vec<CommitInfo>, String> {
         path,
         &[
             "log",
+            "--exclude=refs/stash",
+            "--all",
+            "--topo-order",
             &format!("-{limit}"),
-            "--pretty=format:%H%x00%h%x00%s%x00%an%x00%aI",
+            "--pretty=tformat:%H%x00%h%x00%s%x00%an%x00%aI%x00%P%x00%D",
         ],
     )?;
+    Ok(parse_commit_log(&out))
+}
 
+fn parse_commit_log(out: &str) -> Vec<CommitInfo> {
     let mut commits = Vec::new();
     for line in out.lines() {
         if line.is_empty() {
             continue;
         }
-        let parts: Vec<&str> = line.split('\0').collect();
-        if parts.len() < 5 {
+        if let Some(commit) = parse_commit_line(line) {
+            commits.push(commit);
+        }
+    }
+    commits
+}
+
+fn parse_commit_line(line: &str) -> Option<CommitInfo> {
+    let parts: Vec<&str> = line.split('\0').collect();
+    if parts.len() < 7 {
+        return None;
+    }
+    let parents = if parts[5].is_empty() {
+        Vec::new()
+    } else {
+        parts[5].split_whitespace().map(|h| h.to_string()).collect()
+    };
+    Some(CommitInfo {
+        hash: parts[0].to_string(),
+        short_hash: parts[1].to_string(),
+        subject: parts[2].to_string(),
+        author: parts[3].to_string(),
+        date: parts[4].to_string(),
+        parents,
+        refs: parse_decorations(parts[6]),
+    })
+}
+
+fn parse_decorations(raw: &str) -> Vec<CommitRef> {
+    if raw.is_empty() {
+        return Vec::new();
+    }
+
+    let mut refs = Vec::new();
+    for part in raw.split(',') {
+        let part = part.trim();
+        if part.is_empty() {
             continue;
         }
-        commits.push(CommitInfo {
-            hash: parts[0].to_string(),
-            short_hash: parts[1].to_string(),
-            subject: parts[2].to_string(),
-            author: parts[3].to_string(),
-            date: parts[4].to_string(),
-        });
+        if part == "stash" || part.starts_with("refs/stash") || part.starts_with("notes/") {
+            continue;
+        }
+        if part != "HEAD" && part.ends_with("/HEAD") {
+            continue;
+        }
+
+        if let Some(branch) = part.strip_prefix("HEAD -> ") {
+            refs.push(CommitRef {
+                name: "HEAD".into(),
+                kind: "head".into(),
+            });
+            if !branch.is_empty() {
+                refs.push(CommitRef {
+                    name: branch.to_string(),
+                    kind: "local".into(),
+                });
+            }
+        } else if part == "HEAD" {
+            refs.push(CommitRef {
+                name: "HEAD".into(),
+                kind: "head".into(),
+            });
+        } else if let Some(tag) = part.strip_prefix("tag: ") {
+            if !tag.is_empty() {
+                refs.push(CommitRef {
+                    name: tag.to_string(),
+                    kind: "tag".into(),
+                });
+            }
+        } else if part.contains('/') {
+            refs.push(CommitRef {
+                name: part.to_string(),
+                kind: "remote".into(),
+            });
+        } else {
+            refs.push(CommitRef {
+                name: part.to_string(),
+                kind: "local".into(),
+            });
+        }
     }
-    Ok(commits)
+    refs
 }
 
 fn list_changed_files(path: &str, limit: usize) -> Result<Vec<String>, String> {
@@ -1019,7 +1251,11 @@ fn list_changed_files(path: &str, limit: usize) -> Result<Vec<String>, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_status, provider_from_remote_url, remote_url_host};
+    use super::{
+        is_valid_default_branch, normalize_git_config_key, normalize_git_config_value,
+        parse_commit_log, parse_decorations, parse_git_bool, parse_status,
+        provider_from_remote_url, remote_url_host, CommitInfo, CommitRef,
+    };
 
     #[test]
     fn parses_branch_ahead_behind_and_dirty() {
@@ -1064,10 +1300,7 @@ mod tests {
             provider_from_remote_url("https://github.com/a/b.git"),
             "github"
         );
-        assert_eq!(
-            provider_from_remote_url("git@gitlab.com:a/b.git"),
-            "gitlab"
-        );
+        assert_eq!(provider_from_remote_url("git@gitlab.com:a/b.git"), "gitlab");
         assert_eq!(
             provider_from_remote_url("https://bitbucket.org/a/b.git"),
             "bitbucket"
@@ -1087,6 +1320,127 @@ mod tests {
         assert_eq!(
             provider_from_remote_url("https://git.example.com/a/b.git"),
             "other"
+        );
+    }
+
+    #[test]
+    fn parses_commit_log_parents_and_refs() {
+        let out = "\
+aaa111\0aaa\0merge feat\0Ada\02026-01-02T03:04:05+08:00\0bbb222 ccc333\0HEAD -> main, origin/main, origin/HEAD, tag: v1.0
+bbb222\0bbb\0on main\0Ada\02026-01-01T03:04:05+08:00\0ddd444\0
+ccc333\0ccc\0on feat\0Ada\02026-01-01T04:04:05+08:00\0ddd444\0origin/feat
+ddd444\0ddd\0root\0Ada\02026-01-01T00:00:00+08:00\0\0
+";
+        let commits = parse_commit_log(out);
+        assert_eq!(commits.len(), 4);
+        assert_eq!(
+            commits[0],
+            CommitInfo {
+                hash: "aaa111".into(),
+                short_hash: "aaa".into(),
+                subject: "merge feat".into(),
+                author: "Ada".into(),
+                date: "2026-01-02T03:04:05+08:00".into(),
+                parents: vec!["bbb222".into(), "ccc333".into()],
+                refs: vec![
+                    CommitRef {
+                        name: "HEAD".into(),
+                        kind: "head".into(),
+                    },
+                    CommitRef {
+                        name: "main".into(),
+                        kind: "local".into(),
+                    },
+                    CommitRef {
+                        name: "origin/main".into(),
+                        kind: "remote".into(),
+                    },
+                    CommitRef {
+                        name: "v1.0".into(),
+                        kind: "tag".into(),
+                    },
+                ],
+            }
+        );
+        assert_eq!(commits[3].parents, [] as [String; 0]);
+        assert!(commits[3].refs.is_empty());
+    }
+
+    #[test]
+    fn rejects_unknown_git_config_keys() {
+        assert!(normalize_git_config_key("alias.st").is_err());
+        assert!(normalize_git_config_key("user.name").is_err());
+        assert!(normalize_git_config_key("core.editor").is_err());
+        assert!(normalize_git_config_key("pull.rebase").is_err());
+        assert_eq!(
+            normalize_git_config_key("init.defaultBranch").unwrap(),
+            "init.defaultBranch"
+        );
+    }
+
+    #[test]
+    fn normalizes_allowlisted_git_config_values() {
+        assert_eq!(
+            normalize_git_config_value("core.autocrlf", "Input").unwrap(),
+            "input"
+        );
+        assert_eq!(
+            normalize_git_config_value("fetch.prune", "yes").unwrap(),
+            "true"
+        );
+        assert_eq!(
+            normalize_git_config_value("pull.ff", "ONLY").unwrap(),
+            "only"
+        );
+        assert_eq!(
+            normalize_git_config_value("push.default", "Simple").unwrap(),
+            "simple"
+        );
+        assert_eq!(
+            normalize_git_config_value("color.ui", "AUTO").unwrap(),
+            "auto"
+        );
+        assert!(normalize_git_config_value("core.autocrlf", "lf").is_err());
+        assert!(normalize_git_config_value("pull.ff", "rebase").is_err());
+        assert!(normalize_git_config_value("init.defaultBranch", "HEAD").is_err());
+    }
+
+    #[test]
+    fn validates_default_branch_names() {
+        assert!(is_valid_default_branch("main"));
+        assert!(is_valid_default_branch("trunk"));
+        assert!(is_valid_default_branch("release/1.0"));
+        assert!(!is_valid_default_branch(""));
+        assert!(!is_valid_default_branch("HEAD"));
+        assert!(!is_valid_default_branch("-bad"));
+        assert!(!is_valid_default_branch("foo..bar"));
+        assert!(!is_valid_default_branch("has space"));
+        assert!(!is_valid_default_branch("weird^{}"));
+    }
+
+    #[test]
+    fn parses_git_bool_synonyms() {
+        assert_eq!(parse_git_bool("true"), Some(true));
+        assert_eq!(parse_git_bool("ON"), Some(true));
+        assert_eq!(parse_git_bool("0"), Some(false));
+        assert_eq!(parse_git_bool("maybe"), None);
+    }
+
+    #[test]
+    fn skips_noisy_commit_decorations() {
+        let refs = parse_decorations("HEAD, origin/HEAD, stash, notes/commits, tag: v2");
+        assert_eq!(
+            refs,
+            vec![
+                CommitRef {
+                    name: "HEAD".into(),
+                    kind: "head".into(),
+                },
+                CommitRef {
+                    name: "v2".into(),
+                    kind: "tag".into(),
+                },
+            ]
         );
     }
 }

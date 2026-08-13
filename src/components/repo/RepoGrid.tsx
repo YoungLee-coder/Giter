@@ -5,11 +5,7 @@ import {
   type DraggableAttributes,
   type DraggableSyntheticListeners,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  rectSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
+import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { FolderGit2Icon, GripVerticalIcon } from "lucide-react";
@@ -191,17 +187,11 @@ const SortableRepoCard = memo(function SortableRepoCard({
   onOpenDetail: (repo: RepoStatus) => void;
   disableDrag: boolean;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: repo.path,
-    disabled: disableDrag,
-  });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: repo.path,
+      disabled: disableDrag,
+    });
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -218,11 +208,7 @@ const SortableRepoCard = memo(function SortableRepoCard({
         isDragging={isDragging}
         onToggle={onToggle}
         onOpenDetail={onOpenDetail}
-        dragHandleProps={
-          disableDrag
-            ? undefined
-            : { attributes, listeners, isDragging }
-        }
+        dragHandleProps={disableDrag ? undefined : { attributes, listeners, isDragging }}
       />
     </div>
   );

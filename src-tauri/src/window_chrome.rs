@@ -105,9 +105,7 @@ unsafe fn set_dwm_attr<T>(hwnd: isize, attr: u32, value: &T) {
 pub fn os_prefers_dark() -> bool {
     #[cfg(windows)]
     {
-        apps_use_light_theme()
-            .map(|light| !light)
-            .unwrap_or(false)
+        apps_use_light_theme().map(|light| !light).unwrap_or(false)
     }
     #[cfg(not(windows))]
     {

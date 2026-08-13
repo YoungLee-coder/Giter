@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Project instructions — shared knowledge in .ai/ directory
+  "instructions": [
+    ".ai/project.md",
+    ".ai/architecture.md",
+    ".ai/coding-style.md",
+    ".ai/workflow.md",
+    ".ai/testing.md",
+    ".ai/security.md"
+  ]
+}

@@ -21,6 +21,7 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { CommitGraph } from "@/components/repo/CommitGraph";
 import { useI18n } from "@/hooks/useI18n";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -204,8 +205,8 @@ export function RepoDetailModal({ repo, onClose }: Props) {
   const dateFmt = useMemo(
     () =>
       new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
-        dateStyle: "medium",
-        timeStyle: "short",
+        month: "short",
+        day: "numeric",
       }),
     [locale],
   );
@@ -565,24 +566,10 @@ export function RepoDetailModal({ repo, onClose }: Props) {
                       {t("detailNoCommits")}
                     </p>
                   ) : (
-                    <ul className="soft-panel flex min-w-0 flex-col divide-y divide-border/80">
-                      {detail?.commits.map((commit) => (
-                        <li
-                          key={commit.hash}
-                          className="flex min-w-0 flex-col gap-1 px-3 py-2.5"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {commit.shortHash}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {commit.author} · {formatDate(commit.date)}
-                            </span>
-                          </div>
-                          <p className="text-sm break-words">{commit.subject}</p>
-                        </li>
-                      ))}
-                    </ul>
+                    <CommitGraph
+                      commits={detail?.commits ?? []}
+                      formatDate={formatDate}
+                    />
                   )}
                 </section>
               </>

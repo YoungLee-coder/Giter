@@ -1,0 +1,17 @@
+---
+description: Giter project context — read .ai/ before non-trivial work
+alwaysApply: true
+---
+
+# Giter — project context
+
+Project knowledge lives in `.ai/`. **Read the relevant `.ai/` files before non-trivial work** — do not guess commands, conventions, or architecture.
+
+**`.ai/` file index** — listed in `CLAUDE.md` at the repo root (do not duplicate the list here).
+
+Cursor-specific notes:
+- Prefer the Edit tool over Write for existing files. Use Task with `subagent_type: explore` for broad codebase searches. Frontend IPC stays in `src/lib/tauri.ts`; git/gh stays in `src-tauri/src/git.rs`.
+- **Persistent memory:** when you notice a stable convention, command, or gotcha missing from `.ai/`, propose saving it and ask for confirmation before writing. Invoke `/giter-remember` or follow `.ai/project.md` Persistent memory section.
+- Personal overrides: create `AGENTS.local.md` or `CLAUDE.local.md` at the repo root (gitignored).
+
+Do not duplicate `.ai/` content here — update `.ai/` files when project knowledge changes.

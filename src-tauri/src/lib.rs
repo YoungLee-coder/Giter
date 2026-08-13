@@ -42,6 +42,7 @@ pub fn run() {
             commands::get_app_info,
             commands::get_git_info,
             commands::set_git_identity_field,
+            commands::set_git_config_field,
             window_chrome::sync_window_chrome,
             window_chrome::system_prefers_dark,
         ])
@@ -60,7 +61,11 @@ pub fn run() {
 
             // Paint Windows title bar to match canvas before webview hydrates.
             if let Some(window) = app.get_webview_window("main") {
-                let dark = match settings::load(app.handle()).ok().as_ref().map(|s| s.theme.as_str()) {
+                let dark = match settings::load(app.handle())
+                    .ok()
+                    .as_ref()
+                    .map(|s| s.theme.as_str())
+                {
                     Some("dark") => true,
                     Some("light") => false,
                     // "system" / unknown: follow OS apps theme (not WebView scheme).

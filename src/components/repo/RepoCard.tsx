@@ -34,8 +34,17 @@ export const RepoCardBody = memo(function RepoCardBody({
             aria-label={t("selectRepo", { name: repo.name })}
           />
         </div>
-        <div className="repo-card-icon" aria-hidden="true">
-          <RemoteProviderIcon provider={repo.remoteProvider} />
+        <div
+          className={cn(
+            "repo-card-icon",
+            repo.remoteProvider === "github" && "repo-card-icon--github",
+          )}
+          aria-hidden="true"
+        >
+          <RemoteProviderIcon
+            provider={repo.remoteProvider}
+            className={repo.remoteProvider === "github" ? "size-10" : undefined}
+          />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5 pr-6">
           <div className="flex min-w-0 items-center gap-2">

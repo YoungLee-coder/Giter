@@ -91,9 +91,7 @@ export function BatchBar({
             <DropdownMenuContent align="end" className="min-w-40">
               <DropdownMenuGroup>
                 <DropdownMenuItem onClick={onAdd}>{t("addRepo")}</DropdownMenuItem>
-                <DropdownMenuItem onClick={onScan}>
-                  {t("scanFolder")}
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onScan}>{t("scanFolder")}</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>

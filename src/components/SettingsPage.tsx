@@ -1,18 +1,8 @@
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Update } from "@tauri-apps/plugin-updater";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-} from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowUpCircleIcon,
   CheckIcon,
@@ -25,7 +15,6 @@ import {
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
-  ScanSearchIcon,
   SlidersHorizontalIcon,
   XIcon,
 } from "lucide-react";
@@ -34,19 +23,33 @@ import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  ColorUiLegend,
+  FetchPruneLegend,
+  LineEndingLegend,
+  PullFfLegend,
+  PushDefaultLegend,
+} from "@/components/GitConfigLegends";
 import { useI18n } from "@/hooks/useI18n";
 import { useSettings } from "@/hooks/useSettings";
 import { APP_NAME, GITHUB_URL, RELEASES_URL } from "@/lib/app";
 import { settingsPane, collapse } from "@/lib/motion";
-import {
-  settingsFormSchema,
-  type SettingsFormValues,
-} from "@/lib/settingsSchema";
+import { settingsFormSchema, type SettingsFormValues } from "@/lib/settingsSchema";
 import {
   api,
   type AppInfo,
+  type GitConfigField,
   type GitInfo,
   type GithubProtocol,
   type GithubPublishInfo,
@@ -61,7 +64,10 @@ import {
 } from "@/lib/updater";
 import { cn } from "@/lib/utils";
 
-type SettingsTab = "general" | "scanning" | "git" | "about";
+type SettingsTab = "general" | "git" | "about";
+type GitEditField = "user.name" | "user.email";
+
+const GIT_CONFIG_UNSET = "unset";
 
 type UpdateUiState =
   | { kind: "idle" }
@@ -85,11 +91,6 @@ const TABS: {
     id: "general",
     labelKey: "settingsTabGeneral",
     Icon: SlidersHorizontalIcon,
-  },
-  {
-    id: "scanning",
-    labelKey: "settingsTabScanning",
-    Icon: ScanSearchIcon,
   },
   {
     id: "git",
@@ -182,7 +183,10 @@ export function SettingsPage({ onBack }: Props) {
     max: number,
   ) => {
     const current = form.getValues(field);
-    const next = Math.min(max, Math.max(min, (Number.isFinite(current) ? current : min) + delta));
+    const next = Math.min(
+      max,
+      Math.max(min, (Number.isFinite(current) ? current : min) + delta),
+    );
     form.setValue(field, next, { shouldValidate: true, shouldDirty: true });
     await commitField(field);
   };
@@ -302,10 +306,7 @@ export function SettingsPage({ onBack }: Props) {
 
       <div className="settings-body giter-scroll min-h-0 flex-1 overflow-y-auto">
         <div className="settings-content">
-          <nav
-            className="settings-mobile-nav"
-            aria-label={t("settingsTitle")}
-          >
+          <nav className="settings-mobile-nav" aria-label={t("settingsTitle")}>
             {TABS.map(({ id, labelKey }) => (
               <button
                 key={id}
@@ -327,9 +328,7 @@ export function SettingsPage({ onBack }: Props) {
               initial={reduceMotion ? false : settingsPane.initial}
               animate={settingsPane.animate}
               exit={reduceMotion ? undefined : settingsPane.exit}
-              transition={
-                reduceMotion ? { duration: 0 } : settingsPane.transition
-              }
+              transition={reduceMotion ? { duration: 0 } : settingsPane.transition}
             >
               <header className="settings-pane-header">
                 <div className="settings-pane-icon">
@@ -340,19 +339,15 @@ export function SettingsPage({ onBack }: Props) {
                   <p className="settings-pane-desc text-pretty">
                     {tab === "general"
                       ? t("settingsGeneralHint")
-                      : tab === "scanning"
-                        ? t("settingsScanningHint")
-                        : tab === "git"
-                          ? t("gitMenuHint")
-                          : t("aboutMenuHint")}
+                      : tab === "git"
+                        ? t("gitMenuHint")
+                        : t("aboutMenuHint")}
                   </p>
                 </div>
               </header>
 
               {tab === "general" ? (
-                <GeneralTab />
-              ) : tab === "scanning" ? (
-                <ScanningTab
+                <GeneralTab
                   form={form}
                   scanDepthId={scanDepthId}
                   concurrencyId={concurrencyId}
@@ -386,32 +381,7 @@ export function SettingsPage({ onBack }: Props) {
   );
 }
 
-function GeneralTab() {
-  const { t } = useI18n();
-
-  return (
-    <section className="settings-section" aria-label={t("settingsSectionAppearance")}>
-      <SettingsSectionLabel>{t("settingsSectionAppearance")}</SettingsSectionLabel>
-      <div className="settings-field-group soft-panel">
-        <SettingsFieldRow
-          title={t("langLabel")}
-          description={t("settingsLanguageDescription")}
-        >
-          <div className="[&_[data-slot=toggle-group]]:w-full [&_[data-slot=toggle-group-item]]:flex-1">
-            <LanguageSwitch />
-          </div>
-        </SettingsFieldRow>
-        <SettingsFieldRow title={t("themeLabel")} description={t("themeHint")}>
-          <div className="[&_[data-slot=toggle-group]]:w-full [&_[data-slot=toggle-group-item]]:flex-1">
-            <ThemeSwitch />
-          </div>
-        </SettingsFieldRow>
-      </div>
-    </section>
-  );
-}
-
-function ScanningTab({
+function GeneralTab({
   form,
   scanDepthId,
   concurrencyId,
@@ -432,57 +402,74 @@ function ScanningTab({
   const { t } = useI18n();
 
   return (
-    <form
-      className="settings-section"
-      aria-label={t("settingsSectionScanning")}
-      onSubmit={form.handleSubmit(() => undefined)}
-    >
-      <SettingsSectionLabel>{t("settingsSectionScanning")}</SettingsSectionLabel>
-      <div className="settings-field-group soft-panel">
-        <SettingsFieldRow
-          title={t("scanDepthLabel")}
-          description={t("scanDepthHint")}
-        >
-          <NumberStepper
-            id={scanDepthId}
-            min={1}
-            max={10}
-            value={form.watch("scanDepth")}
-            decrementLabel={`${t("scanDepthLabel")} −`}
-            incrementLabel={`${t("scanDepthLabel")} +`}
-            onDecrement={() => void nudgeField("scanDepth", -1, 1, 10)}
-            onIncrement={() => void nudgeField("scanDepth", 1, 1, 10)}
-            inputProps={form.register("scanDepth", {
-              valueAsNumber: true,
-              onBlur: () => {
-                void commitField("scanDepth");
-              },
-            })}
-          />
-        </SettingsFieldRow>
-        <SettingsFieldRow
-          title={t("concurrencyLabel")}
-          description={t("concurrencyHint")}
-        >
-          <NumberStepper
-            id={concurrencyId}
-            min={1}
-            max={16}
-            value={form.watch("concurrency")}
-            decrementLabel={`${t("concurrencyLabel")} −`}
-            incrementLabel={`${t("concurrencyLabel")} +`}
-            onDecrement={() => void nudgeField("concurrency", -1, 1, 16)}
-            onIncrement={() => void nudgeField("concurrency", 1, 1, 16)}
-            inputProps={form.register("concurrency", {
-              valueAsNumber: true,
-              onBlur: () => {
-                void commitField("concurrency");
-              },
-            })}
-          />
-        </SettingsFieldRow>
-      </div>
-    </form>
+    <div className="settings-section space-y-5">
+      <section aria-label={t("settingsSectionAppearance")}>
+        <SettingsSectionLabel>{t("settingsSectionAppearance")}</SettingsSectionLabel>
+        <div className="settings-field-group soft-panel">
+          <SettingsFieldRow
+            title={t("langLabel")}
+            description={t("settingsLanguageDescription")}
+          >
+            <div className="[&_[data-slot=toggle-group]]:w-full [&_[data-slot=toggle-group-item]]:flex-1">
+              <LanguageSwitch />
+            </div>
+          </SettingsFieldRow>
+          <SettingsFieldRow title={t("themeLabel")} description={t("themeHint")}>
+            <div className="[&_[data-slot=toggle-group]]:w-full [&_[data-slot=toggle-group-item]]:flex-1">
+              <ThemeSwitch />
+            </div>
+          </SettingsFieldRow>
+        </div>
+      </section>
+
+      <form
+        aria-label={t("settingsSectionScanning")}
+        onSubmit={form.handleSubmit(() => undefined)}
+      >
+        <SettingsSectionLabel>{t("settingsSectionScanning")}</SettingsSectionLabel>
+        <div className="settings-field-group soft-panel">
+          <SettingsFieldRow title={t("scanDepthLabel")} description={t("scanDepthHint")}>
+            <NumberStepper
+              id={scanDepthId}
+              min={1}
+              max={10}
+              value={form.watch("scanDepth")}
+              decrementLabel={`${t("scanDepthLabel")} −`}
+              incrementLabel={`${t("scanDepthLabel")} +`}
+              onDecrement={() => void nudgeField("scanDepth", -1, 1, 10)}
+              onIncrement={() => void nudgeField("scanDepth", 1, 1, 10)}
+              inputProps={form.register("scanDepth", {
+                valueAsNumber: true,
+                onBlur: () => {
+                  void commitField("scanDepth");
+                },
+              })}
+            />
+          </SettingsFieldRow>
+          <SettingsFieldRow
+            title={t("concurrencyLabel")}
+            description={t("concurrencyHint")}
+          >
+            <NumberStepper
+              id={concurrencyId}
+              min={1}
+              max={16}
+              value={form.watch("concurrency")}
+              decrementLabel={`${t("concurrencyLabel")} −`}
+              incrementLabel={`${t("concurrencyLabel")} +`}
+              onDecrement={() => void nudgeField("concurrency", -1, 1, 16)}
+              onIncrement={() => void nudgeField("concurrency", 1, 1, 16)}
+              inputProps={form.register("concurrency", {
+                valueAsNumber: true,
+                onBlur: () => {
+                  void commitField("concurrency");
+                },
+              })}
+            />
+          </SettingsFieldRow>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -538,9 +525,7 @@ function GitTab({
         )}
       >
         <div className="min-w-0">
-          <div className="settings-status-card-title">
-            {t("settingsSectionGit")}
-          </div>
+          <div className="settings-status-card-title">{t("settingsSectionGit")}</div>
           <p className="settings-status-card-desc text-pretty">
             {available ? t("gitMenuHint") : t("gitMissingBanner")}
           </p>
@@ -568,6 +553,9 @@ function GitTab({
         onSignedInChange={setGithubSignedIn}
         onLoginSynced={() => void applyGithubIdentity(false)}
       />
+      {gitInfo?.available ? (
+        <GitBehaviorPanel info={gitInfo} onSaved={onGitIdentityMaybeChanged} />
+      ) : null}
     </div>
   );
 }
@@ -664,7 +652,8 @@ function GithubAccountPanel({
   const signedIn = Boolean(info?.login);
   const ghMissing = Boolean(info && !info.available);
   const needsLogin = Boolean(info?.available && !info.login);
-  const protocol = info?.gitProtocol === "ssh" ? "ssh" : info?.gitProtocol === "https" ? "https" : null;
+  const protocol =
+    info?.gitProtocol === "ssh" ? "ssh" : info?.gitProtocol === "https" ? "https" : null;
   const usingSsh = protocol === "ssh";
   const canSetupSsh = signedIn && !usingSsh;
 
@@ -674,9 +663,7 @@ function GithubAccountPanel({
   } else if (ghMissing) {
     description = t("settingsGithubMissing");
   } else if (needsLogin) {
-    description = loggingIn
-      ? t("settingsGithubWaiting")
-      : t("settingsGithubSignInHint");
+    description = loggingIn ? t("settingsGithubWaiting") : t("settingsGithubSignInHint");
   } else if (signedIn) {
     description = usingSsh
       ? t("settingsGithubConnectedSshHint", { login: info!.login! })
@@ -698,9 +685,7 @@ function GithubAccountPanel({
         )}
       >
         <div className="min-w-0">
-          <div className="settings-status-card-title">
-            {t("settingsGitGithub")}
-          </div>
+          <div className="settings-status-card-title">{t("settingsGitGithub")}</div>
           <p className="settings-status-card-desc text-pretty">{description}</p>
           {error && (
             <p className="mt-2 text-xs text-destructive text-pretty" title={error}>
@@ -891,10 +876,7 @@ function AboutTab({
             <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
               {t("tagline")}
             </p>
-            <Badge
-              variant="secondary"
-              className="w-fit rounded-[6px] font-mono text-xs"
-            >
+            <Badge variant="secondary" className="w-fit rounded-[6px] font-mono text-xs">
               {t("aboutVersion", { version: version ?? "…" })}
             </Badge>
           </div>
@@ -937,8 +919,7 @@ function AboutTab({
               </Button>
             </div>
           </div>
-          {(updateState.kind === "downloading" ||
-            updateState.kind === "installing") && (
+          {(updateState.kind === "downloading" || updateState.kind === "installing") && (
             <div className="settings-update-progress">
               <div
                 className="settings-update-progress-bar"
@@ -988,24 +969,136 @@ function SettingsSectionLabel({ children }: { children: ReactNode }) {
 function SettingsFieldRow({
   title,
   description,
+  help,
+  className,
   children,
 }: {
   title: string;
   description?: string;
+  help?: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <div className="settings-field-row">
+    <div className={cn("settings-field-row", className)}>
       <div className="settings-field-row-label">
-        <span className="settings-field-row-title">{title}</span>
+        <span className="settings-field-row-title">
+          {title}
+          {help}
+        </span>
         {description && (
-          <span className="settings-field-row-desc text-pretty">
-            {description}
-          </span>
+          <span className="settings-field-row-desc text-pretty">{description}</span>
         )}
       </div>
       <div className="settings-field-row-control">{children}</div>
     </div>
+  );
+}
+
+function GitConfigHelpButton({
+  title,
+  intro,
+  items,
+}: {
+  title: string;
+  intro: string;
+  items: { label: string; text: string; legend?: ReactNode }[];
+}) {
+  const { t } = useI18n();
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="settings-help-btn"
+          aria-label={t("gitConfigMore")}
+          title={t("gitConfigMore")}
+        >
+          <CircleHelpIcon strokeWidth={1.75} />
+        </button>
+      </DialogTrigger>
+      <DialogContent
+        className="max-h-[min(40rem,calc(100vh-3rem))] overflow-y-auto sm:max-w-lg"
+        showCloseButton
+      >
+        <DialogHeader className="pr-8">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="text-pretty">{intro}</DialogDescription>
+        </DialogHeader>
+        <dl className="flex flex-col gap-3.5">
+          {items.map((item) => (
+            <div key={item.label} className="flex flex-col gap-0.5">
+              <dt className="text-sm font-medium">{item.label}</dt>
+              <dd className="text-sm text-muted-foreground text-pretty">
+                {item.text}
+                {item.legend}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GitSegmentedField({
+  title,
+  description,
+  help,
+  value,
+  options,
+  disabled,
+  saving,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  help?: ReactNode;
+  value: string | null;
+  options: { value: string; label: string }[];
+  disabled: boolean;
+  saving: boolean;
+  onChange: (value: string) => void;
+}) {
+  const selected = value ?? GIT_CONFIG_UNSET;
+
+  return (
+    <SettingsFieldRow
+      className="settings-field-row--choices"
+      title={title}
+      description={description}
+      help={help}
+    >
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        spacing={0}
+        value={selected}
+        disabled={disabled}
+        onValueChange={(next) => {
+          if (!next || next === selected) return;
+          onChange(next === GIT_CONFIG_UNSET ? "" : next);
+        }}
+        aria-label={title}
+        aria-busy={saving}
+        className="mac-segment w-full"
+      >
+        {options.map((option) => (
+          <ToggleGroupItem
+            key={option.value}
+            value={option.value}
+            aria-label={option.label}
+            title={option.label}
+            className="mac-segment-item"
+            disabled={disabled}
+          >
+            {option.label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </SettingsFieldRow>
   );
 }
 
@@ -1019,17 +1112,11 @@ function SettingsLinkRow({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      className="settings-link-row"
-      onClick={onClick}
-    >
+    <button type="button" className="settings-link-row" onClick={onClick}>
       <span className="settings-field-row-label">
         <span className="settings-field-row-title">{title}</span>
         {description && (
-          <span className="settings-field-row-desc text-pretty">
-            {description}
-          </span>
+          <span className="settings-field-row-desc text-pretty">{description}</span>
         )}
       </span>
       <span className="settings-link-row-meta">
@@ -1123,9 +1210,7 @@ function GitInfoPanel({
 }) {
   const { t } = useI18n();
   const reduceMotion = useReducedMotion();
-  const [editingField, setEditingField] = useState<"user.name" | "user.email" | null>(
-    null,
-  );
+  const [editingField, setEditingField] = useState<GitEditField | null>(null);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -1153,11 +1238,9 @@ function GitInfoPanel({
     { label: t("gitInfoExecPath"), value: info.execPath ?? t("gitInfoEmpty") },
   ];
 
-  const startEdit = (field: "user.name" | "user.email") => {
+  const startEdit = (field: GitEditField) => {
     setEditingField(field);
-    setDraft(
-      field === "user.name" ? (info.userName ?? "") : (info.userEmail ?? ""),
-    );
+    setDraft(field === "user.name" ? (info.userName ?? "") : (info.userEmail ?? ""));
     setFieldError(null);
   };
 
@@ -1218,8 +1301,7 @@ function GitInfoPanel({
             draft={editingField === "user.name" ? draft : ""}
             saving={saving && editingField === "user.name"}
             disabled={
-              identitySyncing ||
-              (editingField !== null && editingField !== "user.name")
+              identitySyncing || (editingField !== null && editingField !== "user.name")
             }
             onDraftChange={setDraft}
             onEdit={() => startEdit("user.name")}
@@ -1238,8 +1320,7 @@ function GitInfoPanel({
             draft={editingField === "user.email" ? draft : ""}
             saving={saving && editingField === "user.email"}
             disabled={
-              identitySyncing ||
-              (editingField !== null && editingField !== "user.email")
+              identitySyncing || (editingField !== null && editingField !== "user.email")
             }
             onDraftChange={setDraft}
             onEdit={() => startEdit("user.email")}
@@ -1258,9 +1339,7 @@ function GitInfoPanel({
                 initial={reduceMotion ? false : collapse.initial}
                 animate={collapse.animate}
                 exit={reduceMotion ? undefined : collapse.exit}
-                transition={
-                  reduceMotion ? { duration: 0 } : collapse.transition
-                }
+                transition={reduceMotion ? { duration: 0 } : collapse.transition}
               >
                 <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <p className="min-w-0 text-xs text-muted-foreground text-pretty">
@@ -1306,8 +1385,318 @@ function GitInfoPanel({
   );
 }
 
+function GitBehaviorPanel({ info, onSaved }: { info: GitInfo; onSaved: () => void }) {
+  const { t } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [configSaving, setConfigSaving] = useState<GitConfigField | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  const startEdit = () => {
+    setEditing(true);
+    setDraft(info.defaultBranch ?? "");
+    setFieldError(null);
+    setConfigError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setDraft("");
+    setFieldError(null);
+  };
+
+  const saveDefaultBranch = async () => {
+    const value = draft.trim();
+    if (value && !isLikelyBranchName(value)) {
+      setFieldError(t("gitConfigBranchInvalid"));
+      return;
+    }
+
+    setSaving(true);
+    setFieldError(null);
+    try {
+      await api.setGitConfigField("init.defaultBranch", value);
+      setEditing(false);
+      setDraft("");
+      onSaved();
+    } catch (err) {
+      setFieldError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveConfig = async (field: GitConfigField, value: string) => {
+    setConfigSaving(field);
+    setConfigError(null);
+    try {
+      await api.setGitConfigField(field, value);
+      onSaved();
+    } catch (err) {
+      setConfigError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setConfigSaving(null);
+    }
+  };
+
+  const configBusy = configSaving !== null || editing;
+
+  return (
+    <section>
+      <SettingsSectionLabel>{t("settingsGitBehavior")}</SettingsSectionLabel>
+      <div className="settings-group soft-panel flex min-w-0 flex-col divide-y divide-border/70">
+        <GitIdentityRow
+          label={t("gitConfigDefaultBranch")}
+          help={
+            <GitConfigHelpButton
+              title={t("gitConfigDefaultBranch")}
+              intro={t("gitConfigHelpDefaultBranchIntro")}
+              items={[
+                { label: t("gitInfoEmpty"), text: t("gitConfigHelpDefaultBranchEmpty") },
+                { label: "main", text: t("gitConfigHelpDefaultBranchMain") },
+                { label: "master", text: t("gitConfigHelpDefaultBranchMaster") },
+              ]}
+            />
+          }
+          value={info.defaultBranch}
+          emptyLabel={t("gitInfoEmpty")}
+          editing={editing}
+          draft={editing ? draft : ""}
+          saving={saving && editing}
+          disabled={configSaving !== null}
+          onDraftChange={setDraft}
+          onEdit={startEdit}
+          onCancel={cancelEdit}
+          onSave={() => void saveDefaultBranch()}
+          editLabel={t("gitInfoEdit")}
+          saveLabel={saving ? t("gitInfoSaving") : t("gitInfoSave")}
+          cancelLabel={t("gitInfoCancel")}
+          inputType="text"
+        />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground text-pretty">
+        {t("gitConfigDefaultBranchHint")}
+      </p>
+      {fieldError && (
+        <p className="mt-2 text-xs text-destructive text-pretty" title={fieldError}>
+          {fieldError}
+        </p>
+      )}
+      <div className="settings-field-group soft-panel mt-3">
+        <GitSegmentedField
+          title={t("gitConfigAutocrlf")}
+          description={t("gitConfigAutocrlfHint")}
+          help={
+            <GitConfigHelpButton
+              title={t("gitConfigAutocrlf")}
+              intro={t("gitConfigHelpAutocrlfIntro")}
+              items={[
+                {
+                  label: t("gitConfigUnset"),
+                  text: t("gitConfigHelpAutocrlfUnset"),
+                },
+                {
+                  label: t("gitConfigAutocrlfFalse"),
+                  text: t("gitConfigHelpAutocrlfFalse"),
+                  legend: <LineEndingLegend mode="false" />,
+                },
+                {
+                  label: t("gitConfigAutocrlfInput"),
+                  text: t("gitConfigHelpAutocrlfInput"),
+                  legend: <LineEndingLegend mode="input" />,
+                },
+                {
+                  label: t("gitConfigAutocrlfTrue"),
+                  text: t("gitConfigHelpAutocrlfTrue"),
+                  legend: <LineEndingLegend mode="true" />,
+                },
+              ]}
+            />
+          }
+          value={info.autocrlf}
+          disabled={configBusy}
+          saving={configSaving === "core.autocrlf"}
+          onChange={(value) => void saveConfig("core.autocrlf", value)}
+          options={[
+            { value: GIT_CONFIG_UNSET, label: t("gitConfigUnset") },
+            { value: "false", label: t("gitConfigAutocrlfFalse") },
+            { value: "input", label: t("gitConfigAutocrlfInput") },
+            { value: "true", label: t("gitConfigAutocrlfTrue") },
+          ]}
+        />
+        <GitSegmentedField
+          title={t("gitConfigFetchPrune")}
+          description={t("gitConfigFetchPruneHint")}
+          help={
+            <GitConfigHelpButton
+              title={t("gitConfigFetchPrune")}
+              intro={t("gitConfigHelpFetchPruneIntro")}
+              items={[
+                {
+                  label: t("gitConfigUnset"),
+                  text: t("gitConfigHelpFetchPruneUnset"),
+                },
+                {
+                  label: t("gitConfigOff"),
+                  text: t("gitConfigHelpFetchPruneOff"),
+                  legend: <FetchPruneLegend prune={false} />,
+                },
+                {
+                  label: t("gitConfigOn"),
+                  text: t("gitConfigHelpFetchPruneOn"),
+                  legend: <FetchPruneLegend prune={true} />,
+                },
+              ]}
+            />
+          }
+          value={info.fetchPrune === null ? null : info.fetchPrune ? "true" : "false"}
+          disabled={configBusy}
+          saving={configSaving === "fetch.prune"}
+          onChange={(value) => void saveConfig("fetch.prune", value)}
+          options={[
+            { value: GIT_CONFIG_UNSET, label: t("gitConfigUnset") },
+            { value: "false", label: t("gitConfigOff") },
+            { value: "true", label: t("gitConfigOn") },
+          ]}
+        />
+        <GitSegmentedField
+          title={t("gitConfigPullFf")}
+          description={t("gitConfigPullFfHint")}
+          help={
+            <GitConfigHelpButton
+              title={t("gitConfigPullFf")}
+              intro={t("gitConfigHelpPullFfIntro")}
+              items={[
+                {
+                  label: t("gitConfigUnset"),
+                  text: t("gitConfigHelpPullFfUnset"),
+                },
+                {
+                  label: t("gitConfigPullFfTrue"),
+                  text: t("gitConfigHelpPullFfTrue"),
+                  legend: <PullFfLegend mode="true" />,
+                },
+                {
+                  label: t("gitConfigPullFfOnly"),
+                  text: t("gitConfigHelpPullFfOnly"),
+                  legend: <PullFfLegend mode="only" />,
+                },
+                {
+                  label: t("gitConfigPullFfFalse"),
+                  text: t("gitConfigHelpPullFfFalse"),
+                  legend: <PullFfLegend mode="false" />,
+                },
+              ]}
+            />
+          }
+          value={info.pullFf}
+          disabled={configBusy}
+          saving={configSaving === "pull.ff"}
+          onChange={(value) => void saveConfig("pull.ff", value)}
+          options={[
+            { value: GIT_CONFIG_UNSET, label: t("gitConfigUnset") },
+            { value: "true", label: t("gitConfigPullFfTrue") },
+            { value: "only", label: t("gitConfigPullFfOnly") },
+            { value: "false", label: t("gitConfigPullFfFalse") },
+          ]}
+        />
+        <GitSegmentedField
+          title={t("gitConfigPushDefault")}
+          description={t("gitConfigPushDefaultHint")}
+          help={
+            <GitConfigHelpButton
+              title={t("gitConfigPushDefault")}
+              intro={t("gitConfigHelpPushDefaultIntro")}
+              items={[
+                {
+                  label: t("gitConfigUnset"),
+                  text: t("gitConfigHelpPushDefaultUnset"),
+                },
+                {
+                  label: t("gitConfigPushSimple"),
+                  text: t("gitConfigHelpPushSimple"),
+                  legend: <PushDefaultLegend mode="simple" />,
+                },
+                {
+                  label: t("gitConfigPushCurrent"),
+                  text: t("gitConfigHelpPushCurrent"),
+                  legend: <PushDefaultLegend mode="current" />,
+                },
+                {
+                  label: t("gitConfigPushUpstream"),
+                  text: t("gitConfigHelpPushUpstream"),
+                  legend: <PushDefaultLegend mode="upstream" />,
+                },
+              ]}
+            />
+          }
+          value={info.pushDefault}
+          disabled={configBusy}
+          saving={configSaving === "push.default"}
+          onChange={(value) => void saveConfig("push.default", value)}
+          options={[
+            { value: GIT_CONFIG_UNSET, label: t("gitConfigUnset") },
+            { value: "simple", label: t("gitConfigPushSimple") },
+            { value: "current", label: t("gitConfigPushCurrent") },
+            { value: "upstream", label: t("gitConfigPushUpstream") },
+          ]}
+        />
+        <GitSegmentedField
+          title={t("gitConfigColorUi")}
+          description={t("gitConfigColorUiHint")}
+          help={
+            <GitConfigHelpButton
+              title={t("gitConfigColorUi")}
+              intro={t("gitConfigHelpColorUiIntro")}
+              items={[
+                {
+                  label: t("gitConfigUnset"),
+                  text: t("gitConfigHelpColorUiUnset"),
+                },
+                {
+                  label: t("gitConfigColorAuto"),
+                  text: t("gitConfigHelpColorAuto"),
+                  legend: <ColorUiLegend mode="auto" />,
+                },
+                {
+                  label: t("gitConfigColorAlways"),
+                  text: t("gitConfigHelpColorAlways"),
+                  legend: <ColorUiLegend mode="always" />,
+                },
+                {
+                  label: t("gitConfigColorNever"),
+                  text: t("gitConfigHelpColorNever"),
+                  legend: <ColorUiLegend mode="never" />,
+                },
+              ]}
+            />
+          }
+          value={info.colorUi}
+          disabled={configBusy}
+          saving={configSaving === "color.ui"}
+          onChange={(value) => void saveConfig("color.ui", value)}
+          options={[
+            { value: GIT_CONFIG_UNSET, label: t("gitConfigUnset") },
+            { value: "auto", label: t("gitConfigColorAuto") },
+            { value: "always", label: t("gitConfigColorAlways") },
+            { value: "never", label: t("gitConfigColorNever") },
+          ]}
+        />
+      </div>
+      {configError && (
+        <p className="mt-2 text-xs text-destructive text-pretty" title={configError}>
+          {configError}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function GitIdentityRow({
   label,
+  help,
   value,
   emptyLabel,
   editing,
@@ -1324,6 +1713,7 @@ function GitIdentityRow({
   inputType,
 }: {
   label: string;
+  help?: ReactNode;
   value: string | null;
   emptyLabel: string;
   editing: boolean;
@@ -1343,8 +1733,9 @@ function GitIdentityRow({
 
   return (
     <div className="flex min-w-0 flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-      <div className="shrink-0 text-[11px] font-medium tracking-[0.02em] text-muted-foreground">
+      <div className="flex shrink-0 items-center gap-0.5 text-[11px] font-medium tracking-[0.02em] text-muted-foreground">
         {label}
+        {help}
       </div>
       {editing ? (
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -1435,4 +1826,19 @@ function GitInfoRow({ label, value }: { label: string; value: string }) {
       </div>
     </div>
   );
+}
+
+function isLikelyBranchName(name: string): boolean {
+  if (!name || name.length > 255) return false;
+  if (name === "." || name === ".." || name.toUpperCase() === "HEAD") return false;
+  if (name.startsWith("/") || name.startsWith(".") || name.startsWith("-")) {
+    return false;
+  }
+  if (name.endsWith("/") || name.endsWith(".") || name.endsWith(".lock")) {
+    return false;
+  }
+  if (name.includes("..") || name.includes("//") || name.includes("@{")) {
+    return false;
+  }
+  return !/[\s~^:?*[\\\]]/.test(name);
 }

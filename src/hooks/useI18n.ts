@@ -5,7 +5,9 @@ import { translateBackendMessage, translateStage } from "@/i18n/messages";
 
 export function useI18n() {
   const { t, i18n: i18nInstance } = useTranslation();
-  const locale = (isLocale(i18nInstance.language) ? i18nInstance.language : "en") as Locale;
+  const locale = (
+    isLocale(i18nInstance.language) ? i18nInstance.language : "en"
+  ) as Locale;
 
   const setLocale = useCallback((next: Locale) => {
     try {

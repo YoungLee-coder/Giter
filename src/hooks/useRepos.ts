@@ -3,11 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import i18n from "@/i18n";
 import { queryKeys } from "@/lib/query/keys";
-import {
-  api,
-  type RemovedRepo,
-  type RepoStatus,
-} from "@/lib/tauri";
+import { api, type RemovedRepo, type RepoStatus } from "@/lib/tauri";
 import { clearProgressQueue } from "@/lib/progressBus";
 
 function mergeRepoStatuses(
@@ -16,9 +12,7 @@ function mergeRepoStatuses(
   removedPaths?: Set<string>,
 ): RepoStatus[] {
   const map = new Map(updates.map((r) => [r.path, r]));
-  const base = removedPaths
-    ? repos.filter((r) => !removedPaths.has(r.path))
-    : repos;
+  const base = removedPaths ? repos.filter((r) => !removedPaths.has(r.path)) : repos;
   return base.map((r) => map.get(r.path) ?? r);
 }
 
@@ -105,8 +99,7 @@ export function useRepoActions(options: {
     queryClient.setQueryData(queryKeys.repos, repos);
   };
 
-  const getRepos = () =>
-    queryClient.getQueryData<RepoStatus[]>(queryKeys.repos) ?? [];
+  const getRepos = () => queryClient.getQueryData<RepoStatus[]>(queryKeys.repos) ?? [];
 
   const onAdd = async () => {
     const path = await open({ directory: true, multiple: false });
@@ -166,12 +159,7 @@ export function useRepoActions(options: {
       const notice = removedNotice(result.removed);
       onNotice?.(notice);
       if (notice) toast(notice);
-      if (result.removed.length > 0) {
-        const removed = new Set(result.removed.map((r) => r.path));
-        const next = new Set(selected);
-        for (const path of removed) next.delete(path);
-        setSelected(next);
-      }
+      setSelected(new Set());
     } catch (e) {
       onError?.(String(e));
       toast.error(String(e));
@@ -210,10 +198,9 @@ export function useRepoActions(options: {
     onError?.(null);
     try {
       const updated =
-        mode === "fetch"
-          ? await api.batchFetch(paths)
-          : await api.batchUpdate(paths);
+        mode === "fetch" ? await api.batchFetch(paths) : await api.batchUpdate(paths);
       setRepos(mergeRepoStatuses(getRepos(), updated));
+      setSelected(new Set());
     } catch (e) {
       onError?.(String(e));
       toast.error(String(e));

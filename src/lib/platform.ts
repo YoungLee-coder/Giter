@@ -20,9 +20,7 @@ export const isWindows = (): boolean => {
 export const isLinux = (): boolean => {
   try {
     const ua = navigator.userAgent || "";
-    return (
-      /linux|x11/i.test(ua) && !/android/i.test(ua) && !isMac() && !isWindows()
-    );
+    return /linux|x11/i.test(ua) && !/android/i.test(ua) && !isMac() && !isWindows();
   } catch {
     return false;
   }

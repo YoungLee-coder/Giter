@@ -34,11 +34,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { APP_NAME } from "@/lib/app";
 import { fadePage } from "@/lib/motion";
 import { queueProgress } from "@/lib/progressBus";
-import {
-  DRAG_REGION_ATTR,
-  DRAG_REGION_STYLE,
-  getDragBarHeight,
-} from "@/lib/platform";
+import { DRAG_REGION_ATTR, DRAG_REGION_STYLE, getDragBarHeight } from "@/lib/platform";
 import { api, type BatchProgress } from "@/lib/tauri";
 import {
   checkForAppUpdate,
@@ -274,16 +270,13 @@ function AppHeader({ dragBarHeight }: { dragBarHeight: number }) {
     setUpdateProgress(0);
     setError(null);
     try {
-      await downloadAndInstallUpdate(
-        availableUpdate,
-        ({ downloaded, contentLength }) => {
-          const percent =
-            contentLength && contentLength > 0
-              ? Math.min(100, Math.round((downloaded / contentLength) * 100))
-              : 0;
-          setUpdateProgress(percent);
-        },
-      );
+      await downloadAndInstallUpdate(availableUpdate, ({ downloaded, contentLength }) => {
+        const percent =
+          contentLength && contentLength > 0
+            ? Math.min(100, Math.round((downloaded / contentLength) * 100))
+            : 0;
+        setUpdateProgress(percent);
+      });
       setUpdateProgress(null);
       await relaunchApp();
     } catch (e) {
@@ -445,16 +438,13 @@ function AppBanners() {
     setUpdateProgress(0);
     setError(null);
     try {
-      await downloadAndInstallUpdate(
-        availableUpdate,
-        ({ downloaded, contentLength }) => {
-          const percent =
-            contentLength && contentLength > 0
-              ? Math.min(100, Math.round((downloaded / contentLength) * 100))
-              : 0;
-          setUpdateProgress(percent);
-        },
-      );
+      await downloadAndInstallUpdate(availableUpdate, ({ downloaded, contentLength }) => {
+        const percent =
+          contentLength && contentLength > 0
+            ? Math.min(100, Math.round((downloaded / contentLength) * 100))
+            : 0;
+        setUpdateProgress(percent);
+      });
       setUpdateProgress(null);
       await relaunchApp();
     } catch (e) {
@@ -508,10 +498,19 @@ function AppBanners() {
           )}
           {!updateInstalling && (
             <AlertAction className="static top-auto right-auto col-start-2 mt-2 flex justify-end gap-2">
-              <Button type="button" size="sm" onClick={() => void installAvailableUpdate()}>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void installAvailableUpdate()}
+              >
                 {t("downloadAndInstall")}
               </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={dismissAvailableUpdate}>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={dismissAvailableUpdate}
+              >
                 {t("updateLater")}
               </Button>
             </AlertAction>
@@ -546,12 +545,7 @@ function AppMain() {
 function AppModals() {
   const { detailRepo, setDetailRepo } = useAppUi();
 
-  return (
-    <RepoDetailModal
-      repo={detailRepo}
-      onClose={() => setDetailRepo(null)}
-    />
-  );
+  return <RepoDetailModal repo={detailRepo} onClose={() => setDetailRepo(null)} />;
 }
 
 export default App;

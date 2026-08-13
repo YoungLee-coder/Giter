@@ -13,12 +13,8 @@ describe("settingsFormSchema", () => {
   });
 
   it("rejects out-of-range values", () => {
-    expect(() =>
-      settingsFormSchema.parse({ scanDepth: 0, concurrency: 4 }),
-    ).toThrow();
-    expect(() =>
-      settingsFormSchema.parse({ scanDepth: 3, concurrency: 17 }),
-    ).toThrow();
+    expect(() => settingsFormSchema.parse({ scanDepth: 0, concurrency: 4 })).toThrow();
+    expect(() => settingsFormSchema.parse({ scanDepth: 3, concurrency: 17 })).toThrow();
   });
 
   it("coerces string numbers", () => {

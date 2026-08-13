@@ -37,12 +37,21 @@ export type RemoteInfo = {
   url: string;
 };
 
+export type CommitRefKind = "head" | "local" | "remote" | "tag";
+
+export type CommitRef = {
+  name: string;
+  kind: CommitRefKind | string;
+};
+
 export type CommitInfo = {
   hash: string;
   shortHash: string;
   subject: string;
   author: string;
   date: string;
+  parents: string[];
+  refs: CommitRef[];
 };
 
 export type RepoDetail = {
@@ -73,7 +82,21 @@ export type GitInfo = {
   execPath: string | null;
   userName: string | null;
   userEmail: string | null;
+  defaultBranch: string | null;
+  autocrlf: string | null;
+  fetchPrune: boolean | null;
+  pullFf: string | null;
+  pushDefault: string | null;
+  colorUi: string | null;
 };
+
+export type GitConfigField =
+  | "init.defaultBranch"
+  | "core.autocrlf"
+  | "fetch.prune"
+  | "pull.ff"
+  | "push.default"
+  | "color.ui";
 
 export type GithubProtocol = "https" | "ssh";
 
@@ -135,4 +158,6 @@ export const api = {
   getGitInfo: () => invoke<GitInfo>("get_git_info"),
   setGitIdentityField: (field: "user.name" | "user.email", value: string) =>
     invoke<GitInfo>("set_git_identity_field", { field, value }),
+  setGitConfigField: (field: GitConfigField, value: string) =>
+    invoke<GitInfo>("set_git_config_field", { field, value }),
 };

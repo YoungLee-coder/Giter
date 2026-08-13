@@ -85,7 +85,13 @@ pub async fn list_repos(app: AppHandle) -> Result<Vec<RepoStatus>, String> {
     let app_store = app.clone();
     let paths = tokio::task::spawn_blocking(move || {
         let store = store::load(&app_store)?;
-        Ok::<_, String>(store.repos.iter().map(|r| r.path.clone()).collect::<Vec<_>>())
+        Ok::<_, String>(
+            store
+                .repos
+                .iter()
+                .map(|r| r.path.clone())
+                .collect::<Vec<_>>(),
+        )
     })
     .await
     .map_err(|e| format!("list join error: {e}"))??;
@@ -512,10 +518,7 @@ pub async fn get_settings(app: AppHandle) -> Result<AppSettings, String> {
 }
 
 #[tauri::command]
-pub async fn update_settings(
-    app: AppHandle,
-    next: AppSettings,
-) -> Result<AppSettings, String> {
+pub async fn update_settings(app: AppHandle, next: AppSettings) -> Result<AppSettings, String> {
     run_blocking("update_settings", move || {
         let sanitized = next.sanitize();
         settings::save(&app, &sanitized)?;
@@ -542,14 +545,7 @@ pub async fn get_app_info(app: AppHandle) -> Result<AppInfo, String> {
 pub async fn get_git_info() -> git::GitInfo {
     tokio::task::spawn_blocking(git::git_info)
         .await
-        .unwrap_or(git::GitInfo {
-            available: false,
-            version: None,
-            path: None,
-            exec_path: None,
-            user_name: None,
-            user_email: None,
-        })
+        .unwrap_or_else(|_| git::GitInfo::unavailable())
 }
 
 #[tauri::command]
@@ -557,4 +553,11 @@ pub async fn set_git_identity_field(field: String, value: String) -> Result<git:
     tokio::task::spawn_blocking(move || git::set_git_identity_field(&field, &value))
         .await
         .map_err(|e| format!("set_git_identity_field join error: {e}"))?
+}
+
+#[tauri::command]
+pub async fn set_git_config_field(field: String, value: String) -> Result<git::GitInfo, String> {
+    tokio::task::spawn_blocking(move || git::set_git_config_field(&field, &value))
+        .await
+        .map_err(|e| format!("set_git_config_field join error: {e}"))?
 }

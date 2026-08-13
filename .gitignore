@@ -49,3 +49,14 @@ coverage/
 # OS
 .DS_Store
 Thumbs.db
+
+# --- AI configuration ---
+# Thin entry files (tracked). Project knowledge is in .ai/ (tracked).
+# Personal overrides stay out of git.
+CLAUDE.local.md
+AGENTS.local.md
+AGENTS.override.md
+# Track shared .claude config, ignore local overrides.
+.claude/settings.local.json
+# opencode state directory
+.opencode/

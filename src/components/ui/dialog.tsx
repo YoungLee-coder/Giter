@@ -1,31 +1,26 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Dialog as DialogPrimitive } from "radix-ui"
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-} from "framer-motion"
+import * as React from "react";
+import { Dialog as DialogPrimitive } from "radix-ui";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { fadePage } from "@/lib/motion"
-import { XIcon } from "lucide-react"
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { fadePage } from "@/lib/motion";
+import { XIcon } from "lucide-react";
 
 type DialogMotionContextValue = {
-  open: boolean
-}
+  open: boolean;
+};
 
-const DialogMotionContext =
-  React.createContext<DialogMotionContextValue | null>(null)
+const DialogMotionContext = React.createContext<DialogMotionContextValue | null>(null);
 
 function useDialogOpen() {
-  return React.useContext(DialogMotionContext)?.open ?? false
+  return React.useContext(DialogMotionContext)?.open ?? false;
 }
 
-const MotionOverlay = motion.create(DialogPrimitive.Overlay)
-const MotionContent = motion.create(DialogPrimitive.Content)
+const MotionOverlay = motion.create(DialogPrimitive.Overlay);
+const MotionContent = motion.create(DialogPrimitive.Content);
 
 function Dialog({
   open,
@@ -34,11 +29,9 @@ function Dialog({
   children,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(
-    defaultOpen ?? false,
-  )
-  const isControlled = open !== undefined
-  const openValue = isControlled ? !!open : uncontrolledOpen
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen ?? false);
+  const isControlled = open !== undefined;
+  const openValue = isControlled ? !!open : uncontrolledOpen;
 
   return (
     <DialogMotionContext.Provider value={{ open: openValue }}>
@@ -47,40 +40,36 @@ function Dialog({
         open={open}
         defaultOpen={defaultOpen}
         onOpenChange={(next) => {
-          if (!isControlled) setUncontrolledOpen(next)
-          onOpenChange?.(next)
+          if (!isControlled) setUncontrolledOpen(next);
+          onOpenChange?.(next);
         }}
         {...props}
       >
         {children}
       </DialogPrimitive.Root>
     </DialogMotionContext.Provider>
-  )
+  );
 }
 
 function DialogTrigger({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
-function DialogPortal({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
+function DialogPortal({ ...props }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
+  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 
-function DialogClose({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Close>) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.Close>) {
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
 function DialogOverlay({
   className,
   ...props
 }: React.ComponentProps<typeof MotionOverlay>) {
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useReducedMotion();
 
   return (
     <MotionOverlay
@@ -93,7 +82,7 @@ function DialogOverlay({
       transition={reduceMotion ? { duration: 0 } : fadePage.transition}
       {...props}
     />
-  )
+  );
 }
 
 function DialogContent({
@@ -105,11 +94,11 @@ function DialogContent({
   React.ComponentProps<typeof DialogPrimitive.Content>,
   "asChild" | "forceMount"
 > & {
-  showCloseButton?: boolean
+  showCloseButton?: boolean;
 }) {
-  const open = useDialogOpen()
-  const reduceMotion = useReducedMotion()
-  const transition = reduceMotion ? { duration: 0 } : fadePage.transition
+  const open = useDialogOpen();
+  const reduceMotion = useReducedMotion();
+  const transition = reduceMotion ? { duration: 0 } : fadePage.transition;
 
   return (
     <DialogPortal forceMount>
@@ -136,11 +125,7 @@ function DialogContent({
             {children}
             {showCloseButton ? (
               <DialogPrimitive.Close data-slot="dialog-close" asChild>
-                <Button
-                  variant="ghost"
-                  className="absolute top-2 right-2"
-                  size="icon-sm"
-                >
+                <Button variant="ghost" className="absolute top-2 right-2" size="icon-sm">
                   <XIcon />
                   <span className="sr-only">Close</span>
                 </Button>
@@ -150,7 +135,7 @@ function DialogContent({
         ) : null}
       </AnimatePresence>
     </DialogPortal>
-  )
+  );
 }
 
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
@@ -160,7 +145,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
       className={cn("flex flex-col gap-2", className)}
       {...props}
     />
-  )
+  );
 }
 
 function DialogFooter({
@@ -169,7 +154,7 @@ function DialogFooter({
   children,
   ...props
 }: React.ComponentProps<"div"> & {
-  showCloseButton?: boolean
+  showCloseButton?: boolean;
 }) {
   return (
     <div
@@ -187,7 +172,7 @@ function DialogFooter({
         </DialogPrimitive.Close>
       )}
     </div>
-  )
+  );
 }
 
 function DialogTitle({
@@ -203,7 +188,7 @@ function DialogTitle({
       )}
       {...props}
     />
-  )
+  );
 }
 
 function DialogDescription({
@@ -219,7 +204,7 @@ function DialogDescription({
       )}
       {...props}
     />
-  )
+  );
 }
 
 export {
@@ -233,4 +218,4 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
-}
+};

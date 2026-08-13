@@ -5,119 +5,120 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
-      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", system-ui,
-      sans-serif;
-    --font-mono: "SF Mono", ui-monospace, "Cascadia Mono", "Segoe UI Mono",
-      Menlo, Consolas, monospace;
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-background: var(--background);
-    --color-foreground: var(--foreground);
-    --color-toolbar: var(--toolbar);
-    --color-ok: var(--ok);
-    --color-warn: var(--warn);
-    --color-run: var(--run);
-    --radius-sm: calc(var(--radius) * 0.7);
-    --radius-md: calc(var(--radius) * 0.85);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.35);
-    --radius-2xl: calc(var(--radius) * 1.7);
-    --radius-3xl: calc(var(--radius) * 2.1);
-    --radius-4xl: calc(var(--radius) * 2.5);
+  --font-heading: var(--font-sans);
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei UI", system-ui, sans-serif;
+  --font-mono:
+    "SF Mono", ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-toolbar: var(--toolbar);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-run: var(--run);
+  --radius-sm: calc(var(--radius) * 0.7);
+  --radius-md: calc(var(--radius) * 0.85);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.35);
+  --radius-2xl: calc(var(--radius) * 1.7);
+  --radius-3xl: calc(var(--radius) * 2.1);
+  --radius-4xl: calc(var(--radius) * 2.5);
 }
 
 :root {
-    color-scheme: light;
-    --background: #ffffff;
-    --foreground: rgba(0, 0, 0, 0.86);
-    --card: #ffffff;
-    --card-foreground: rgba(0, 0, 0, 0.86);
-    --popover: #ffffff;
-    --popover-foreground: rgba(0, 0, 0, 0.86);
-    --primary: #007aff;
-    --primary-foreground: #ffffff;
-    --secondary: rgba(0, 0, 0, 0.055);
-    --secondary-foreground: rgba(0, 0, 0, 0.86);
-    --muted: #f0f1f4;
-    --muted-foreground: rgba(0, 0, 0, 0.52);
-    --accent: color-mix(in srgb, var(--primary) 10%, transparent);
-    --accent-foreground: rgba(0, 0, 0, 0.86);
-    --destructive: #d70015;
-    --border: rgba(0, 0, 0, 0.08);
-    --input: rgba(0, 0, 0, 0.12);
-    --ring: rgba(10, 132, 255, 0.4);
-    --toolbar: #ffffff;
-    --ok: #248a3d;
-    --warn: #9a6700;
-    --run: #0071e3;
-    --repo-hover: color-mix(in srgb, var(--primary) 18%, var(--card));
-    --radius: 0.75rem;
-    --shadow-control: 0 1px 2px rgba(15, 23, 42, 0.04),
-      0 1px 1px rgba(15, 23, 42, 0.03);
-    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04),
-      0 4px 12px rgba(15, 23, 42, 0.04);
-    --shadow-segment: 0 0.5px 1px rgba(0, 0, 0, 0.1),
-      0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-dialog: 0 8px 28px rgba(15, 23, 42, 0.12),
-      0 2px 8px rgba(15, 23, 42, 0.06);
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: rgba(0, 0, 0, 0.86);
+  --card: #ffffff;
+  --card-foreground: rgba(0, 0, 0, 0.86);
+  --popover: #ffffff;
+  --popover-foreground: rgba(0, 0, 0, 0.86);
+  --primary: #007aff;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(0, 0, 0, 0.055);
+  --secondary-foreground: rgba(0, 0, 0, 0.86);
+  --muted: #f0f1f4;
+  --muted-foreground: rgba(0, 0, 0, 0.52);
+  --accent: color-mix(in srgb, var(--primary) 10%, transparent);
+  --accent-foreground: rgba(0, 0, 0, 0.86);
+  --destructive: #d70015;
+  --border: rgba(0, 0, 0, 0.08);
+  --input: rgba(0, 0, 0, 0.12);
+  --ring: rgba(10, 132, 255, 0.4);
+  --toolbar: #ffffff;
+  --ok: #248a3d;
+  --warn: #9a6700;
+  --run: #0071e3;
+  --lane-violet: #7c3aed;
+  --lane-teal: #0f766e;
+  --lane-coral: #c2410c;
+  --lane-slate: #475569;
+  --repo-hover: color-mix(in srgb, var(--primary) 18%, var(--card));
+  --radius: 0.75rem;
+  --shadow-control: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --shadow-segment: 0 0.5px 1px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-dialog: 0 8px 28px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
 
-    /* Motion tokens — cc-switch style (ease-out / duration-200|300) */
-    --motion-ease: ease;
-    --motion-ease-out: ease-out;
-    --motion-ease-in-out: ease-in-out;
-    --motion-duration-fast: 150ms;
-    --motion-duration-color: 200ms;
-    --motion-duration-panel: 300ms;
+  /* Motion tokens — cc-switch style (ease-out / duration-200|300) */
+  --motion-ease: ease;
+  --motion-ease-out: ease-out;
+  --motion-ease-in-out: ease-in-out;
+  --motion-duration-fast: 150ms;
+  --motion-duration-color: 200ms;
+  --motion-duration-panel: 300ms;
 }
 
 .dark {
-    color-scheme: dark;
-    --background: #121417;
-    --foreground: rgba(255, 255, 255, 0.9);
-    --card: #1c1f26;
-    --card-foreground: rgba(255, 255, 255, 0.9);
-    --popover: #232833;
-    --popover-foreground: rgba(255, 255, 255, 0.9);
-    --primary: #0a84ff;
-    --primary-foreground: #ffffff;
-    --secondary: rgba(255, 255, 255, 0.08);
-    --secondary-foreground: rgba(255, 255, 255, 0.9);
-    --muted: #252a33;
-    --muted-foreground: rgba(255, 255, 255, 0.55);
-    --accent: color-mix(in srgb, var(--primary) 16%, transparent);
-    --accent-foreground: rgba(255, 255, 255, 0.9);
-    --destructive: #ff453a;
-    --border: rgba(255, 255, 255, 0.08);
-    --input: rgba(255, 255, 255, 0.14);
-    --ring: rgba(10, 132, 255, 0.5);
-    --toolbar: #16191f;
-    --ok: #30d158;
-    --warn: #ffd60a;
-    --run: #64d2ff;
-    --repo-hover: color-mix(in srgb, var(--primary) 22%, var(--card));
-    --shadow-control: 0 1px 2px rgba(0, 0, 0, 0.35);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28),
-      0 6px 16px rgba(0, 0, 0, 0.28);
-    --shadow-segment: 0 0.5px 1px rgba(0, 0, 0, 0.4),
-      0 0 0 0.5px rgba(255, 255, 255, 0.06);
-    --shadow-dialog: 0 12px 36px rgba(0, 0, 0, 0.48),
-      0 2px 10px rgba(0, 0, 0, 0.32);
+  color-scheme: dark;
+  --background: #121417;
+  --foreground: rgba(255, 255, 255, 0.9);
+  --card: #1c1f26;
+  --card-foreground: rgba(255, 255, 255, 0.9);
+  --popover: #232833;
+  --popover-foreground: rgba(255, 255, 255, 0.9);
+  --primary: #0a84ff;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(255, 255, 255, 0.08);
+  --secondary-foreground: rgba(255, 255, 255, 0.9);
+  --muted: #252a33;
+  --muted-foreground: rgba(255, 255, 255, 0.55);
+  --accent: color-mix(in srgb, var(--primary) 16%, transparent);
+  --accent-foreground: rgba(255, 255, 255, 0.9);
+  --destructive: #ff453a;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.14);
+  --ring: rgba(10, 132, 255, 0.5);
+  --toolbar: #16191f;
+  --ok: #30d158;
+  --warn: #ffd60a;
+  --run: #64d2ff;
+  --lane-violet: #bf5af2;
+  --lane-teal: #64d2c0;
+  --lane-coral: #ff7a59;
+  --lane-slate: #8e9bb5;
+  --repo-hover: color-mix(in srgb, var(--primary) 22%, var(--card));
+  --shadow-control: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28), 0 6px 16px rgba(0, 0, 0, 0.28);
+  --shadow-segment: 0 0.5px 1px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+  --shadow-dialog: 0 12px 36px rgba(0, 0, 0, 0.48), 0 2px 10px rgba(0, 0, 0, 0.32);
 }
 
 @layer base {
@@ -411,9 +412,336 @@
 }
 
 .settings-field-row-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1.35;
+}
+
+.settings-help-btn {
+  display: inline-flex;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+}
+
+.settings-help-btn svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.settings-help-btn:hover,
+.settings-help-btn[data-state="open"] {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+.settings-help-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 45%, transparent);
+}
+
+.git-config-legend {
+  margin-top: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: calc(var(--radius-md));
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  background: color-mix(in srgb, var(--muted) 70%, var(--card));
+}
+
+.git-legend-flow,
+.git-legend-row,
+.git-legend-graphs,
+.git-legend-terms {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.git-legend-flow,
+.git-legend-row {
+  flex-wrap: wrap;
+}
+
+.git-legend-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.git-legend-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.git-legend-kicker {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted-foreground);
+}
+
+.git-legend-kicker--row {
+  flex: 0 0 auto;
+  min-width: 3.75rem;
+}
+
+.git-legend-note {
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+
+.git-legend-note--ok {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.git-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.git-legend-chip--lf {
+  color: var(--lane-teal);
+  border-color: color-mix(in srgb, var(--lane-teal) 38%, var(--border));
+  background: color-mix(in srgb, var(--lane-teal) 12%, var(--card));
+}
+
+.git-legend-chip--crlf {
+  color: var(--lane-coral);
+  border-color: color-mix(in srgb, var(--lane-coral) 38%, var(--border));
+  background: color-mix(in srgb, var(--lane-coral) 12%, var(--card));
+}
+
+.git-legend-chip--ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 38%, var(--border));
+  background: color-mix(in srgb, var(--ok) 12%, var(--card));
+}
+
+.git-legend-chip--head {
+  color: var(--run);
+  border-color: color-mix(in srgb, var(--run) 40%, var(--border));
+  background: color-mix(in srgb, var(--run) 12%, var(--card));
+}
+
+.git-legend-chip--remote {
+  color: var(--lane-violet);
+  border-color: color-mix(in srgb, var(--lane-violet) 38%, var(--border));
+  background: color-mix(in srgb, var(--lane-violet) 12%, var(--card));
+}
+
+.git-legend-chip--warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--border));
+  background: color-mix(in srgb, var(--warn) 12%, var(--card));
+}
+
+.git-legend-chip--strike {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.git-legend-arrow {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 1.75rem;
+  color: var(--muted-foreground);
+}
+
+.git-legend-arrow-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.git-legend-arrow-line {
+  width: 1.35rem;
+  height: 0;
+  margin-top: 0.15rem;
+  border-top: 1.5px solid color-mix(in srgb, var(--foreground) 28%, transparent);
+  position: relative;
+}
+
+.git-legend-arrow-line::after {
+  content: "";
+  position: absolute;
+  top: -3.5px;
+  right: -1px;
+  border: 3.5px solid transparent;
+  border-left-color: color-mix(in srgb, var(--foreground) 28%, transparent);
+  border-right-width: 0;
+}
+
+.git-legend-graph-wrap {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.git-legend-graphs {
+  align-items: flex-end;
+  gap: 0.65rem;
+}
+
+.git-legend-graph {
+  display: block;
+  width: 100%;
+  max-width: 9.5rem;
+  height: 2.85rem;
+  overflow: visible;
+}
+
+.git-legend-caption {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.git-legend-edge {
+  fill: none;
+  stroke: color-mix(in srgb, var(--foreground) 38%, transparent);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.git-legend-edge--remote {
+  stroke: var(--lane-violet);
+}
+
+.git-legend-edge--merge {
+  stroke: var(--run);
+}
+
+.git-legend-edge--refuse {
+  stroke: var(--destructive);
+  stroke-width: 2;
+}
+
+.git-legend-node {
+  fill: var(--card);
+  stroke: color-mix(in srgb, var(--foreground) 45%, transparent);
+  stroke-width: 1.75;
+}
+
+.git-legend-node--head {
+  fill: var(--run);
+  stroke: var(--run);
+}
+
+.git-legend-node--remote {
+  fill: var(--lane-violet);
+  stroke: var(--lane-violet);
+}
+
+.git-legend-node--ok {
+  fill: var(--ok);
+  stroke: var(--ok);
+}
+
+.git-legend-node--warn {
+  fill: var(--warn);
+  stroke: var(--warn);
+}
+
+.git-legend-terms {
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+@media (max-width: 420px) {
+  .git-legend-graphs,
+  .git-legend-terms,
+  .git-legend-flow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .git-legend-col,
+  .git-legend-graph-wrap {
+    align-items: flex-start;
+  }
+
+  .git-legend-arrow {
+    flex-direction: row;
+    min-width: 0;
+    gap: 0.35rem;
+  }
+
+  .git-legend-arrow-line {
+    width: 1.1rem;
+  }
+}
+
+.git-legend-term {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.git-legend-term-body {
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.28rem 0.45rem;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--foreground) 88%, var(--card));
+  color: color-mix(in srgb, var(--card) 82%, var(--foreground));
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.git-legend-term-body .git-legend-add,
+.git-legend-term-body .git-legend-del {
+  color: inherit;
+  opacity: 0.72;
+}
+
+.git-legend-term-body.is-colored .git-legend-add {
+  color: #30d158;
+  opacity: 1;
+}
+
+.git-legend-term-body.is-colored .git-legend-del {
+  color: #ff6b6b;
+  opacity: 1;
+}
+
+.git-legend-ansi {
+  color: color-mix(in srgb, var(--card) 55%, var(--foreground));
+  font-weight: 500;
+}
+
+.git-legend-term-body.is-ansi .git-legend-add,
+.git-legend-term-body.is-ansi .git-legend-del {
+  color: inherit;
+  opacity: 0.8;
 }
 
 .settings-field-row-desc {
@@ -700,6 +1028,17 @@
   .settings-field-row--stack {
     align-items: flex-start;
   }
+
+  .settings-field-row--choices {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.7rem;
+  }
+
+  .settings-field-row--choices .settings-field-row-control {
+    width: 100%;
+    justify-content: stretch;
+  }
 }
 
 .settings-page-title {
@@ -781,6 +1120,14 @@
   transition: transform var(--motion-duration-panel) var(--motion-ease-out);
 }
 
+.repo-card-icon--github {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
 .repo-card:not(.is-dragging):hover .repo-card-icon {
   transform: scale(1.05);
 }
@@ -816,6 +1163,110 @@
 
 .soft-panel.soft-panel--flat {
   box-shadow: none;
+}
+
+/* Commit graph inside repo detail — one overlay SVG so lanes stay continuous */
+.commit-graph {
+  --graph-node-y: 30%;
+  --graph-inset-start: 0.7rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.commit-graph__overlay {
+  position: absolute;
+  top: 0;
+  left: var(--graph-inset-start);
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.commit-graph__row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  gap: 0.55rem;
+  padding-inline: var(--graph-inset-start) 0.85rem;
+}
+
+.commit-graph__lanes {
+  position: relative;
+  flex-shrink: 0;
+  align-self: stretch;
+  min-height: 2.5rem;
+}
+
+.commit-graph__dot {
+  position: absolute;
+  top: var(--graph-node-y);
+  z-index: 1;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lane-color);
+  transform: translate(-50%, -50%);
+}
+
+.commit-graph__dot--head {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 0 2px var(--lane-color);
+}
+
+.commit-graph__body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-block: 0.4rem 0.5rem;
+}
+
+.commit-graph__title {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.4rem;
+}
+
+.commit-graph__subject {
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: 100%;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.commit-graph__refs {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem;
+}
+
+.commit-graph__meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.35rem;
+  row-gap: 0.1rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--muted-foreground);
+}
+
+.commit-graph__hash {
+  font-family: var(--font-mono);
+  color: color-mix(in srgb, var(--foreground) 62%, transparent);
 }
 
 /* Standalone settings action tiles (legacy / one-off) */
