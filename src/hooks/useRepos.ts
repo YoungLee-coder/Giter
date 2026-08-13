@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import i18n from "@/i18n";
-import { queryKeys } from "@/lib/query/keys";
+import { queryKeys, REPOS_STALE_TIME_MS } from "@/lib/query";
 import { api, type RemovedRepo, type RepoStatus } from "@/lib/tauri";
 import { clearProgressQueue } from "@/lib/progressBus";
 
@@ -29,6 +29,9 @@ export function useReposQuery() {
   return useQuery({
     queryKey: queryKeys.repos,
     queryFn: () => api.listRepos(),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    staleTime: REPOS_STALE_TIME_MS,
   });
 }
 
@@ -36,6 +39,9 @@ export function useGitOkQuery() {
   return useQuery({
     queryKey: queryKeys.gitOk,
     queryFn: () => api.checkGit().catch(() => false),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -168,6 +174,7 @@ export function useRepoActions(options: {
       clearProgressQueue();
       setBusy(false);
       setRefreshing(false);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.gitOk });
     }
   };
 

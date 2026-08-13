@@ -624,10 +624,19 @@ function GithubAccountPanel({
   useEffect(() => {
     if (!active || !loggingIn) return;
     loginSyncedRef.current = false;
-    const id = window.setInterval(() => {
+    const tick = () => {
+      if (document.hidden) return;
       void load();
-    }, 2500);
-    return () => window.clearInterval(id);
+    };
+    const id = window.setInterval(tick, 2500);
+    const onVisibility = () => {
+      if (!document.hidden) tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- poll while waiting for gh auth
   }, [active, loggingIn]);
 

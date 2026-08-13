@@ -1339,7 +1339,7 @@ dependencies = [
 
 [[package]]
 name = "giter"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "serde",
  "serde_json",

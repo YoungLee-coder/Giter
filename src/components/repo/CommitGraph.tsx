@@ -38,8 +38,10 @@ export function CommitGraph({ commits, formatDate }: Props) {
   const maxCols = Math.max(1, ...rows.map((row) => row.laneCount));
   const graphW = maxCols * COL_W;
   const listRef = useRef<HTMLUListElement>(null);
-  const [geoms, setGeoms] = useState<RowGeom[]>([]);
-  const [overlayH, setOverlayH] = useState(0);
+  const [layout, setLayout] = useState<{ geoms: RowGeom[]; overlayH: number }>({
+    geoms: [],
+    overlayH: 0,
+  });
 
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -56,16 +58,28 @@ export function CommitGraph({ commits, formatDate }: Props) {
           bottom: top + height,
         });
       });
-      setGeoms(next);
-      setOverlayH(list.scrollHeight);
+      setLayout({ geoms: next, overlayH: list.scrollHeight });
+    };
+
+    let raf = 0;
+    const schedule = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        measure();
+      });
     };
 
     measure();
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(schedule);
     observer.observe(list);
-    list.querySelectorAll(".commit-graph__row").forEach((row) => observer.observe(row));
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, [rows]);
+
+  const { geoms, overlayH } = layout;
 
   const edges = useMemo(
     () => (geoms.length === rows.length ? commitGraphEdges(rows, geoms, COL_W) : []),

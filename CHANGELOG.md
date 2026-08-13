@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-08-13
+
+### Changed
+
+- Repo git status no longer refreshes on window focus; use Refresh, add, scan, or batch operations
+- Cache remote-provider and `git` executable path to avoid extra subprocesses
+- Windows: watch OS theme via the registry instead of polling; macOS: suspend the webview when the window is in the background
+- Use opaque window chrome (no backdrop blur) and drop detail-modal data after close
+- Generate GitHub Release notes from CHANGELOG plus per-platform download links
+
 ## [0.5.0] - 2026-08-13
 
 ### Added

@@ -17,7 +17,7 @@
 - `src-tauri/src/scan.rs` — 浅扫描；跳过 `node_modules`/`target`/`dist`/`build`/隐藏目录；不进入嵌套仓库。
 - `src-tauri/src/settings.rs` — 设置读写与 clamp（scanDepth 1–10，concurrency 1–16）。
 - `src-tauri/tauri.conf.json` — 窗口、打包、updater pubkey / `latest.json` endpoint。
-- `.github/workflows/release.yml` — 版本三处一致时在 `main` 上打 tag `v*` 并发布。
+- `.github/workflows/release.yml` — 版本三处一致时在 `main` 上打 tag `v*` 并发布；notes 由 `.github/scripts/build-release-notes.sh` 生成（CHANGELOG + 各平台安装包直链）。
 - `tests/` — Vitest（jsdom）：settings schema、queryKeys、i18n 键同步。
 
 ## Hotspot Ownership

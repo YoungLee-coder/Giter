@@ -74,6 +74,8 @@ pub fn run() {
                 window_chrome::apply_window_chrome(&window, dark);
             }
 
+            window_chrome::start_os_theme_watch(app.handle().clone());
+
             Ok(())
         })
         .run(tauri::generate_context!())

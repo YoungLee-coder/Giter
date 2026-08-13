@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import {
   DEFAULT_SETTINGS,
   api,
@@ -89,9 +90,12 @@ export function applyTheme(theme: ThemePreference) {
 
 let systemThemeListener: ((e: MediaQueryListEvent) => void) | null = null;
 let unlistenWindowTheme: (() => void) | null = null;
-let systemPollTimer: ReturnType<typeof setInterval> | null = null;
+let unlistenOsTheme: (() => void) | null = null;
+let systemVisibilityListener: (() => void) | null = null;
+let themeWatchSeq = 0;
 
 function clearSystemThemeWatchers() {
+  themeWatchSeq += 1;
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   if (systemThemeListener) {
     media.removeEventListener("change", systemThemeListener);
@@ -101,9 +105,13 @@ function clearSystemThemeWatchers() {
     unlistenWindowTheme();
     unlistenWindowTheme = null;
   }
-  if (systemPollTimer) {
-    clearInterval(systemPollTimer);
-    systemPollTimer = null;
+  if (unlistenOsTheme) {
+    unlistenOsTheme();
+    unlistenOsTheme = null;
+  }
+  if (systemVisibilityListener) {
+    document.removeEventListener("visibilitychange", systemVisibilityListener);
+    systemVisibilityListener = null;
   }
 }
 
@@ -111,11 +119,19 @@ export function syncSystemThemeListener(theme: ThemePreference) {
   clearSystemThemeWatchers();
   if (theme !== "system") return;
 
+  const seq = themeWatchSeq;
   const reapply = () => applyTheme("system");
 
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   systemThemeListener = () => reapply();
   media.addEventListener("change", systemThemeListener);
+
+  systemVisibilityListener = () => {
+    if (document.hidden) return;
+    if (document.documentElement.dataset.theme) return;
+    reapply();
+  };
+  document.addEventListener("visibilitychange", systemVisibilityListener);
 
   // When window theme follows OS (or setTheme works), Tauri emits this.
   void getCurrentWindow()
@@ -123,7 +139,7 @@ export function syncSystemThemeListener(theme: ThemePreference) {
       reapply();
     })
     .then((unlisten) => {
-      if (document.documentElement.dataset.theme) {
+      if (seq !== themeWatchSeq || document.documentElement.dataset.theme) {
         unlisten();
         return;
       }
@@ -133,16 +149,23 @@ export function syncSystemThemeListener(theme: ThemePreference) {
       /* outside Tauri */
     });
 
-  // Windows: PreferredColorScheme can desync from the OS; poll registry-backed API.
+  // Windows: WebView2 PreferredColorScheme can desync from the OS.
+  // The backend watches AppsUseLightTheme (no timer) and emits this.
   if (isWindows()) {
-    systemPollTimer = setInterval(() => {
+    void listen<boolean>("os-theme-changed", () => {
       if (document.documentElement.dataset.theme) return;
-      void (async () => {
-        const dark = await osPrefersDark();
-        const shown = document.documentElement.classList.contains("dark");
-        if (dark !== shown) reapply();
-      })();
-    }, 2000);
+      reapply();
+    })
+      .then((unlisten) => {
+        if (seq !== themeWatchSeq || document.documentElement.dataset.theme) {
+          unlisten();
+          return;
+        }
+        unlistenOsTheme = unlisten;
+      })
+      .catch(() => {
+        /* outside Tauri */
+      });
   }
 }
 

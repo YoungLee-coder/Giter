@@ -2,6 +2,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useCallback,
   useRef,
   useState,
   type FormEvent,
@@ -211,21 +212,35 @@ export function RepoDetailModal({ repo, onClose }: Props) {
     [locale],
   );
 
+  const formatDate = useCallback(
+    (iso: string) => {
+      const d = new Date(iso);
+      return Number.isNaN(d.getTime()) ? iso : dateFmt.format(d);
+    },
+    [dateFmt],
+  );
+
   // Keep last repo while Dialog exit animation plays (cc-switch / Radix pattern).
   const [displayRepo, setDisplayRepo] = useState<RepoStatus | null>(repo);
   useEffect(() => {
-    if (repo) setDisplayRepo(repo);
+    if (repo) {
+      setDisplayRepo(repo);
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setDisplayRepo(null);
+      setDetail(null);
+      setError(null);
+      setLoading(false);
+      applyInitialRemote();
+    }, 250);
+    return () => window.clearTimeout(timeout);
   }, [repo]);
 
   if (!displayRepo) return null;
 
   const status = detail?.status ?? displayRepo;
   const activeRepo = displayRepo;
-
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : dateFmt.format(d);
-  };
 
   const onAddRemote = async (event: FormEvent) => {
     event.preventDefault();

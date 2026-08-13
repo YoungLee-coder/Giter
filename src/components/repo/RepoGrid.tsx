@@ -69,8 +69,8 @@ export function RepoGrid({
     if (!grid) return;
     scrollRef.current = grid.closest(".giter-scroll") as HTMLElement | null;
     const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width ?? 0;
-      setGridWidth(w);
+      const w = Math.round(entries[0]?.contentRect.width ?? 0);
+      setGridWidth((prev) => (prev === w ? prev : w));
     });
     ro.observe(grid);
     setGridWidth(grid.clientWidth);

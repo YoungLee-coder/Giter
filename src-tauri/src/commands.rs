@@ -130,6 +130,9 @@ pub async fn remove_repos(app: AppHandle, paths: Vec<String>) -> Result<(), Stri
             return Ok(());
         }
         let remove: HashSet<String> = paths.into_iter().collect();
+        for path in &remove {
+            git::forget_remote_provider(path);
+        }
         let mut store = store::load(&app)?;
         store.repos.retain(|r| !remove.contains(&r.path));
         store::save(&app, &store)
@@ -215,7 +218,7 @@ pub async fn refresh_status(
                 },
             );
 
-            tokio::task::spawn_blocking(move || git::status(&path))
+            tokio::task::spawn_blocking(move || git::status_fresh(&path))
                 .await
                 .map_err(|e| format!("status join error: {e}"))
         }));
@@ -272,6 +275,9 @@ fn prepare_refresh(app: AppHandle, paths: Option<Vec<String>>) -> Result<Refresh
     }
 
     if !removed_paths.is_empty() {
+        for path in &removed_paths {
+            git::forget_remote_provider(path);
+        }
         store.repos.retain(|r| !removed_paths.contains(&r.path));
         store::save(&app, &store)?;
     }
@@ -389,26 +395,28 @@ async fn run_batch(
             );
 
             let (progress, status) = tokio::task::spawn_blocking(move || {
-                let progress = if do_update {
-                    match git::update_one(&path) {
-                        Ok(p) | Err(p) => p,
-                    }
+                if do_update {
+                    git::update_one(&path)
                 } else {
                     match git::fetch(&path) {
-                        Ok(()) => BatchProgress {
-                            path: path.clone(),
-                            stage: "done".into(),
-                            message: Some("Fetched".into()),
-                        },
-                        Err(err) => BatchProgress {
-                            path: path.clone(),
-                            stage: "error".into(),
-                            message: Some(err),
-                        },
+                        Ok(()) => (
+                            BatchProgress {
+                                path: path.clone(),
+                                stage: "done".into(),
+                                message: Some("Fetched".into()),
+                            },
+                            git::status(&path),
+                        ),
+                        Err(err) => (
+                            BatchProgress {
+                                path: path.clone(),
+                                stage: "error".into(),
+                                message: Some(err),
+                            },
+                            git::status(&path),
+                        ),
                     }
-                };
-                let status = git::status(&path);
-                (progress, status)
+                }
             })
             .await
             .unwrap_or_else(|e| {

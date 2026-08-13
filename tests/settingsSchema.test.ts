@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { settingsFormSchema } from "../src/lib/settingsSchema";
 import { queryKeys } from "../src/lib/query/keys";
+import { queryClient, REPOS_STALE_TIME_MS } from "../src/lib/query";
 import en from "../src/i18n/locales/en.json";
 import zhCN from "../src/i18n/locales/zh-CN.json";
 
@@ -30,6 +31,15 @@ describe("queryKeys", () => {
     expect(queryKeys.repos).toEqual(["repos"]);
     expect(queryKeys.settings).toEqual(["settings"]);
     expect(queryKeys.repoDetail("/tmp/a")).toEqual(["repoDetail", "/tmp/a"]);
+  });
+});
+
+describe("queryClient defaults", () => {
+  it("does not refetch on focus or reconnect", () => {
+    const defaults = queryClient.getDefaultOptions().queries;
+    expect(defaults?.refetchOnWindowFocus).toBe(false);
+    expect(defaults?.refetchOnReconnect).toBe(false);
+    expect(REPOS_STALE_TIME_MS).toBe(Infinity);
   });
 });
 

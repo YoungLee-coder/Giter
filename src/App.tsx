@@ -131,7 +131,7 @@ function App() {
     >
       {dragBarHeight > 0 && (
         <div
-          className="fixed top-0 left-0 right-0 z-[70] bg-background/80 backdrop-blur-md"
+          className="fixed top-0 left-0 right-0 z-[70] bg-background"
           data-tauri-drag-region
           style={
             {
@@ -194,7 +194,7 @@ function AppSettingsHeader({
 
   return (
     <header
-      className="app-header settings-page-header fixed z-50 w-full bg-background/80 backdrop-blur-md"
+      className="app-header settings-page-header fixed z-50 w-full bg-background"
       {...DRAG_REGION_ATTR}
       style={
         {
@@ -290,7 +290,7 @@ function AppHeader({ dragBarHeight }: { dragBarHeight: number }) {
 
   return (
     <header
-      className="app-header fixed z-50 w-full bg-background/80 backdrop-blur-md transition-all duration-300"
+      className="app-header fixed z-50 w-full bg-background"
       {...DRAG_REGION_ATTR}
       style={
         {

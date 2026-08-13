@@ -1,7 +1,8 @@
 use serde::Serialize;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -83,24 +84,80 @@ fn windows_tool_dirs() -> Vec<PathBuf> {
     dirs
 }
 
+fn command_for_exe(exe: &Path) -> Command {
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new(exe);
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd
+    }
+    #[cfg(not(windows))]
+    {
+        Command::new(exe)
+    }
+}
+
 fn git_command() -> Command {
+    if let Some(exe) = resolved_git_exe() {
+        return command_for_exe(exe);
+    }
     command_in_path("git")
 }
 
 fn gh_command() -> Command {
     if let Some(exe) = resolved_gh_exe() {
-        #[cfg(windows)]
-        {
-            let mut cmd = Command::new(exe);
-            cmd.creation_flags(CREATE_NO_WINDOW);
-            return cmd;
-        }
-        #[cfg(not(windows))]
-        {
-            return Command::new(exe);
-        }
+        return command_for_exe(exe);
     }
     command_in_path("gh")
+}
+
+/// Cached absolute `git` path. Misses are not stored so a later install is picked up.
+fn resolved_git_exe() -> Option<&'static Path> {
+    static GIT_EXE: OnceLock<PathBuf> = OnceLock::new();
+    if let Some(path) = GIT_EXE.get() {
+        return Some(path.as_path());
+    }
+    let found = find_git_exe()?;
+    Some(GIT_EXE.get_or_init(|| found).as_path())
+}
+
+fn find_git_exe() -> Option<PathBuf> {
+    if let Some(path) = which_program("git") {
+        return Some(path);
+    }
+
+    #[cfg(windows)]
+    {
+        const CANDIDATES: &[&str] = &[
+            r"C:\Program Files\Git\cmd\git.exe",
+            r"C:\Program Files\Git\bin\git.exe",
+            r"C:\Program Files (x86)\Git\cmd\git.exe",
+            r"C:\Program Files (x86)\Git\bin\git.exe",
+        ];
+        for candidate in CANDIDATES {
+            let path = PathBuf::from(candidate);
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        const CANDIDATES: &[&str] = &[
+            "/opt/homebrew/bin/git",
+            "/usr/local/bin/git",
+            "/usr/bin/git",
+        ];
+        for candidate in CANDIDATES {
+            let path = PathBuf::from(candidate);
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+
+    None
 }
 
 /// Absolute path to `gh` when resolved from PATH or known install locations.
@@ -530,32 +587,7 @@ pub fn set_git_identity_field(field: &str, value: &str) -> Result<GitInfo, Strin
 }
 
 fn resolve_git_path() -> Option<String> {
-    #[cfg(windows)]
-    {
-        let output = where_command().arg("git").output().ok()?;
-        if !output.status.success() {
-            return None;
-        }
-        let text = String::from_utf8(output.stdout).ok()?;
-        text.lines()
-            .next()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-    }
-    #[cfg(not(windows))]
-    {
-        let output = Command::new("which").arg("git").output().ok()?;
-        if !output.status.success() {
-            return None;
-        }
-        let text = String::from_utf8(output.stdout).ok()?;
-        let trimmed = text.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
-    }
+    resolved_git_exe().map(|p| p.to_string_lossy().into_owned())
 }
 
 fn run_git(cwd: &str, args: &[&str]) -> Result<String, String> {
@@ -589,8 +621,26 @@ pub fn repo_name(path: &str) -> String {
 }
 
 pub fn status(path: &str) -> RepoStatus {
+    collect_status(path, ProviderLookup::Cached)
+}
+
+/// Like [`status`], but re-reads remotes (user Refresh / remotes changed outside the app).
+pub fn status_fresh(path: &str) -> RepoStatus {
+    collect_status(path, ProviderLookup::Refresh)
+}
+
+enum ProviderLookup {
+    Cached,
+    Refresh,
+    Skip,
+}
+
+fn collect_status(path: &str, provider: ProviderLookup) -> RepoStatus {
     let name = repo_name(path);
     if !crate::store::is_git_repo(path) {
+        if matches!(provider, ProviderLookup::Refresh) {
+            forget_remote_provider(path);
+        }
         return RepoStatus {
             path: path.to_string(),
             name,
@@ -604,7 +654,11 @@ pub fn status(path: &str) -> RepoStatus {
         };
     }
 
-    let remote_provider = detect_remote_provider(path);
+    let remote_provider = match provider {
+        ProviderLookup::Cached => remote_provider_for(path, false),
+        ProviderLookup::Refresh => remote_provider_for(path, true),
+        ProviderLookup::Skip => None,
+    };
 
     match run_git(path, &["status", "--porcelain=v2", "--branch"]) {
         Ok(out) => parse_status(path, &name, &out, remote_provider),
@@ -671,18 +725,22 @@ pub fn detail(path: &str) -> Result<RepoDetail, String> {
         return Err(format!("Not a git repository: {path}"));
     }
 
-    let (status, remotes, commits, changed_files) = std::thread::scope(|s| {
-        let status_t = s.spawn(|| status(path));
-        let remotes_t = s.spawn(|| list_remotes(path).unwrap_or_default());
+    let (mut status, remotes_result, commits, changed_files) = std::thread::scope(|s| {
+        let status_t = s.spawn(|| collect_status(path, ProviderLookup::Skip));
+        let remotes_t = s.spawn(|| list_remotes(path));
         let commits_t = s.spawn(|| list_commits(path, 20).unwrap_or_default());
         let files_t = s.spawn(|| list_changed_files(path, 30).unwrap_or_default());
         (
-            status_t.join().unwrap_or_else(|_| status(path)),
-            remotes_t.join().unwrap_or_default(),
+            status_t
+                .join()
+                .unwrap_or_else(|_| collect_status(path, ProviderLookup::Skip)),
+            remotes_t.join().unwrap_or_else(|_| list_remotes(path)),
             commits_t.join().unwrap_or_default(),
             files_t.join().unwrap_or_default(),
         )
     });
+
+    let remotes = apply_remotes_to_status(path, &mut status, remotes_result);
 
     Ok(RepoDetail {
         status,
@@ -1018,6 +1076,69 @@ fn run_gh(cwd: &str, args: &[&str]) -> Result<String, String> {
     }
 }
 
+static PROVIDER_CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+
+fn provider_cache() -> &'static Mutex<HashMap<String, Option<String>>> {
+    PROVIDER_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn remember_remote_provider(path: &str, provider: Option<String>) {
+    if let Ok(mut cache) = provider_cache().lock() {
+        cache.insert(path.to_string(), provider);
+    }
+}
+
+pub fn forget_remote_provider(path: &str) {
+    if let Ok(mut cache) = provider_cache().lock() {
+        cache.remove(path);
+    }
+}
+
+fn cached_remote_provider(path: &str) -> Option<Option<String>> {
+    provider_cache().lock().ok()?.get(path).cloned()
+}
+
+fn remote_provider_for(path: &str, refresh: bool) -> Option<String> {
+    if !refresh {
+        if let Some(cached) = cached_remote_provider(path) {
+            return cached;
+        }
+    }
+    let provider = detect_remote_provider(path);
+    remember_remote_provider(path, provider.clone());
+    provider
+}
+
+fn provider_from_remotes(remotes: &[RemoteInfo]) -> Option<String> {
+    let url = remotes
+        .iter()
+        .find(|r| r.name == "origin")
+        .or_else(|| remotes.first())
+        .map(|r| r.url.as_str())?;
+    Some(provider_from_remote_url(url).to_string())
+}
+
+fn apply_remotes_to_status(
+    path: &str,
+    status: &mut RepoStatus,
+    remotes: Result<Vec<RemoteInfo>, String>,
+) -> Vec<RemoteInfo> {
+    match remotes {
+        Ok(list) => {
+            let provider = provider_from_remotes(&list);
+            remember_remote_provider(path, provider.clone());
+            status.remote_provider = provider;
+            list
+        }
+        Err(_) => {
+            if let Some(cached) = cached_remote_provider(path) {
+                status.remote_provider = cached;
+            }
+            Vec::new()
+        }
+    }
+}
+
 fn list_remotes(path: &str) -> Result<Vec<RemoteInfo>, String> {
     let out = run_git(path, &["remote", "-v"])?;
     let mut remotes = Vec::new();
@@ -1042,21 +1163,8 @@ fn list_remotes(path: &str) -> Result<Vec<RemoteInfo>, String> {
     Ok(remotes)
 }
 
-fn primary_remote_url(path: &str) -> Option<String> {
-    let remotes = list_remotes(path).ok()?;
-    if remotes.is_empty() {
-        return None;
-    }
-    remotes
-        .iter()
-        .find(|r| r.name == "origin")
-        .or_else(|| remotes.first())
-        .map(|r| r.url.clone())
-}
-
 fn detect_remote_provider(path: &str) -> Option<String> {
-    let url = primary_remote_url(path)?;
-    Some(provider_from_remote_url(&url).to_string())
+    provider_from_remotes(&list_remotes(path).ok()?)
 }
 
 fn provider_from_remote_url(url: &str) -> &'static str {
@@ -1252,10 +1360,18 @@ fn list_changed_files(path: &str, limit: usize) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::{
+        apply_remotes_to_status, cached_remote_provider, find_git_exe, forget_remote_provider,
         is_valid_default_branch, normalize_git_config_key, normalize_git_config_value,
         parse_commit_log, parse_decorations, parse_git_bool, parse_status,
-        provider_from_remote_url, remote_url_host, CommitInfo, CommitRef,
+        provider_from_remote_url, provider_from_remotes, remember_remote_provider, remote_url_host,
+        CommitInfo, CommitRef, RemoteInfo, RepoStatus,
     };
+
+    #[test]
+    fn finds_git_executable() {
+        let path = find_git_exe().expect("git should be available in the test environment");
+        assert!(path.is_file(), "{}", path.display());
+    }
 
     #[test]
     fn parses_branch_ahead_behind_and_dirty() {
@@ -1321,6 +1437,77 @@ mod tests {
             provider_from_remote_url("https://git.example.com/a/b.git"),
             "other"
         );
+    }
+
+    #[test]
+    fn prefers_origin_when_deriving_provider() {
+        let remotes = vec![
+            RemoteInfo {
+                name: "upstream".into(),
+                url: "https://gitlab.com/a/b.git".into(),
+            },
+            RemoteInfo {
+                name: "origin".into(),
+                url: "https://github.com/a/b.git".into(),
+            },
+        ];
+        assert_eq!(provider_from_remotes(&remotes).as_deref(), Some("github"));
+        assert_eq!(provider_from_remotes(&[]).as_deref(), None);
+    }
+
+    #[test]
+    fn remote_provider_cache_roundtrip() {
+        const PATH: &str = "/tmp/giter-provider-cache-test";
+        forget_remote_provider(PATH);
+        remember_remote_provider(PATH, Some("github".into()));
+        assert_eq!(cached_remote_provider(PATH), Some(Some("github".into())));
+        forget_remote_provider(PATH);
+        assert_eq!(cached_remote_provider(PATH), None);
+    }
+
+    #[test]
+    fn detail_remote_failure_keeps_cached_provider() {
+        const PATH: &str = "/tmp/giter-provider-cache-detail-fail";
+        forget_remote_provider(PATH);
+        remember_remote_provider(PATH, Some("github".into()));
+        let mut status = RepoStatus {
+            path: PATH.into(),
+            name: "demo".into(),
+            branch: None,
+            upstream: None,
+            ahead: 0,
+            behind: 0,
+            dirty: false,
+            last_error: None,
+            remote_provider: None,
+        };
+        let remotes = apply_remotes_to_status(PATH, &mut status, Err("git failed".into()));
+        assert!(remotes.is_empty());
+        assert_eq!(status.remote_provider.as_deref(), Some("github"));
+        assert_eq!(cached_remote_provider(PATH), Some(Some("github".into())));
+        forget_remote_provider(PATH);
+    }
+
+    #[test]
+    fn empty_remotes_cache_none_provider() {
+        const PATH: &str = "/tmp/giter-provider-cache-empty-remotes";
+        forget_remote_provider(PATH);
+        remember_remote_provider(PATH, Some("gitlab".into()));
+        let mut status = RepoStatus {
+            path: PATH.into(),
+            name: "demo".into(),
+            branch: None,
+            upstream: None,
+            ahead: 0,
+            behind: 0,
+            dirty: false,
+            last_error: None,
+            remote_provider: Some("gitlab".into()),
+        };
+        apply_remotes_to_status(PATH, &mut status, Ok(Vec::new()));
+        assert_eq!(status.remote_provider, None);
+        assert_eq!(cached_remote_provider(PATH), Some(None));
+        forget_remote_provider(PATH);
     }
 
     #[test]
@@ -1453,49 +1640,67 @@ pub fn pull_ff_only(path: &str) -> Result<(), String> {
     run_git(path, &["pull", "--ff-only"]).map(|_| ())
 }
 
-/// Fetch then FF-only pull when clean and behind. Returns (stage, message).
-pub fn update_one(path: &str) -> Result<BatchProgress, BatchProgress> {
+/// Fetch then FF-only pull when clean and behind.
+pub fn update_one(path: &str) -> (BatchProgress, RepoStatus) {
     if let Err(err) = fetch(path) {
-        return Err(BatchProgress {
-            path: path.to_string(),
-            stage: "error".into(),
-            message: Some(format!("fetch failed: {err}")),
-        });
+        return (
+            BatchProgress {
+                path: path.to_string(),
+                stage: "error".into(),
+                message: Some(format!("fetch failed: {err}")),
+            },
+            status(path),
+        );
     }
 
     let st = status(path);
     if st.dirty {
-        return Ok(BatchProgress {
-            path: path.to_string(),
-            stage: "skipped".into(),
-            message: Some("Working tree is dirty".into()),
-        });
+        return (
+            BatchProgress {
+                path: path.to_string(),
+                stage: "skipped".into(),
+                message: Some("Working tree is dirty".into()),
+            },
+            st,
+        );
     }
     if st.upstream.is_none() {
-        return Ok(BatchProgress {
-            path: path.to_string(),
-            stage: "skipped".into(),
-            message: Some("No upstream branch".into()),
-        });
+        return (
+            BatchProgress {
+                path: path.to_string(),
+                stage: "skipped".into(),
+                message: Some("No upstream branch".into()),
+            },
+            st,
+        );
     }
     if st.behind == 0 {
-        return Ok(BatchProgress {
-            path: path.to_string(),
-            stage: "skipped".into(),
-            message: Some("Already up to date".into()),
-        });
+        return (
+            BatchProgress {
+                path: path.to_string(),
+                stage: "skipped".into(),
+                message: Some("Already up to date".into()),
+            },
+            st,
+        );
     }
 
     match pull_ff_only(path) {
-        Ok(()) => Ok(BatchProgress {
-            path: path.to_string(),
-            stage: "done".into(),
-            message: Some(format!("Fast-forwarded (was behind by {})", st.behind)),
-        }),
-        Err(err) => Err(BatchProgress {
-            path: path.to_string(),
-            stage: "error".into(),
-            message: Some(format!("pull --ff-only failed: {err}")),
-        }),
+        Ok(()) => (
+            BatchProgress {
+                path: path.to_string(),
+                stage: "done".into(),
+                message: Some(format!("Fast-forwarded (was behind by {})", st.behind)),
+            },
+            status(path),
+        ),
+        Err(err) => (
+            BatchProgress {
+                path: path.to_string(),
+                stage: "error".into(),
+                message: Some(format!("pull --ff-only failed: {err}")),
+            },
+            st,
+        ),
     }
 }
