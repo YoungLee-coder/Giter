@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-08-13
+
 ### Fixed
 
 - Settings → Theme stays on Light/Dark after you pick it (and other settings save again); `update_settings` IPC argument name matches the frontend payload
