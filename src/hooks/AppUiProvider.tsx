@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Update } from "@tauri-apps/plugin-updater";
-import type { BatchProgress, RepoStatus } from "@/lib/tauri";
+import type { BatchProgress, RemoteRename, RepoStatus } from "@/lib/tauri";
 import { clearProgressQueue } from "@/lib/progressBus";
 import { setProgressWriter } from "@/lib/progressWriter";
 
@@ -28,6 +28,7 @@ type AppUiContextValue = {
   notice: string | null;
   settingsOpen: boolean;
   detailRepo: RepoStatus | null;
+  remoteRenames: RemoteRename[];
   availableUpdate: Update | null;
   updateInstalling: boolean;
   updateProgress: number | null;
@@ -48,6 +49,7 @@ type AppUiContextValue = {
   setNotice: (notice: string | null) => void;
   setSettingsOpen: (open: boolean) => void;
   setDetailRepo: (repo: RepoStatus | null) => void;
+  setRemoteRenames: (renames: RemoteRename[]) => void;
   setAvailableUpdate: (update: Update | null) => void;
   setUpdateInstalling: (value: boolean) => void;
   setUpdateProgress: (value: number | null) => void;
@@ -64,6 +66,7 @@ export function AppUiProvider({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailRepo, setDetailRepo] = useState<RepoStatus | null>(null);
+  const [remoteRenames, setRemoteRenames] = useState<RemoteRename[]>([]);
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
   const [updateInstalling, setUpdateInstalling] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<number | null>(null);
@@ -117,6 +120,7 @@ export function AppUiProvider({ children }: { children: ReactNode }) {
       notice,
       settingsOpen,
       detailRepo,
+      remoteRenames,
       availableUpdate,
       updateInstalling,
       updateProgress,
@@ -133,6 +137,7 @@ export function AppUiProvider({ children }: { children: ReactNode }) {
       setNotice,
       setSettingsOpen,
       setDetailRepo,
+      setRemoteRenames,
       setAvailableUpdate,
       setUpdateInstalling,
       setUpdateProgress,
@@ -146,6 +151,7 @@ export function AppUiProvider({ children }: { children: ReactNode }) {
       notice,
       settingsOpen,
       detailRepo,
+      remoteRenames,
       availableUpdate,
       updateInstalling,
       updateProgress,

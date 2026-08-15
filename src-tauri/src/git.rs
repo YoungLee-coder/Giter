@@ -263,6 +263,27 @@ pub struct RemovedRepo {
 pub struct RefreshResult {
     pub repos: Vec<RepoStatus>,
     pub removed: Vec<RemovedRepo>,
+    pub remote_renames: Vec<RemoteRename>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchResult {
+    pub repos: Vec<RepoStatus>,
+    pub remote_renames: Vec<RemoteRename>,
+}
+
+/// A remote whose repository was renamed or transferred on the host, detected
+/// while fetching. Applying it is always the user's call — see `apply_remote_rename`.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteRename {
+    pub path: String,
+    pub repo_name: String,
+    /// Remote name, e.g. `origin`.
+    pub remote: String,
+    pub old_url: String,
+    pub new_url: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -611,6 +632,32 @@ fn run_git(cwd: &str, args: &[&str]) -> Result<String, String> {
         };
         Err(msg)
     }
+}
+
+/// Like [`run_git`], but also hands back stderr on success. `git fetch` reports
+/// HTTP redirects there ("warning: redirecting to …"), which is how a renamed
+/// remote repository shows up.
+fn run_git_capture(cwd: &str, args: &[&str]) -> (Result<(), String>, String) {
+    let output = match git_command().args(args).current_dir(cwd).output() {
+        Ok(output) => output,
+        Err(e) => return (Err(format!("Failed to run git: {e}")), String::new()),
+    };
+
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if output.status.success() {
+        return (Ok(()), stderr);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let trimmed = stderr.trim();
+    let msg = if !trimmed.is_empty() {
+        trimmed.to_string()
+    } else if !stdout.is_empty() {
+        stdout
+    } else {
+        format!("git {:?} failed", args)
+    };
+    (Err(msg), stderr)
 }
 
 pub fn repo_name(path: &str) -> String {
@@ -1232,6 +1279,239 @@ fn remote_url_host(url: &str) -> Option<String> {
     }
 }
 
+/// `owner/repo` part of a remote URL, lowercased and stripped of `.git` and any
+/// trailing slash, so two spellings of the same repository compare equal.
+fn remote_url_repo_path(url: &str) -> Option<String> {
+    let url = url.trim();
+    if url.is_empty() {
+        return None;
+    }
+
+    let rest = if let Some(rest) = url.strip_prefix("git@") {
+        // scp-like: git@host:owner/repo.git
+        rest.split_once(':')?.1.to_string()
+    } else {
+        let without_scheme = if let Some(idx) = url.find("://") {
+            &url[idx + 3..]
+        } else {
+            url
+        };
+        let without_auth = without_scheme.rsplit('@').next().unwrap_or(without_scheme);
+        without_auth.split_once('/')?.1.to_string()
+    };
+
+    let trimmed = rest.trim().trim_matches('/');
+    let trimmed = trimmed.strip_suffix(".git").unwrap_or(trimmed);
+    let trimmed = trimmed.trim_end_matches('/');
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_ascii_lowercase())
+    }
+}
+
+/// (host, owner/repo) identity used to tell "same repository, different URL"
+/// from "different repository".
+fn remote_url_repo_key(url: &str) -> Option<(String, String)> {
+    let host = remote_url_host(url)?.to_ascii_lowercase();
+    let repo = remote_url_repo_path(url)?;
+    Some((host, repo))
+}
+
+fn is_ssh_remote_url(url: &str) -> bool {
+    let url = url.trim();
+    url.starts_with("git@") || url.starts_with("ssh://") || url.starts_with("git+ssh://")
+}
+
+/// Swap the `owner/repo` part of a remote URL while keeping its scheme, host,
+/// port and `.git` suffix, so an SSH remote stays an SSH remote.
+fn rewrite_remote_url_repo_path(url: &str, new_repo_path: &str) -> Option<String> {
+    let url = url.trim();
+    let suffix = if url.trim_end_matches('/').ends_with(".git") {
+        ".git"
+    } else {
+        ""
+    };
+
+    if let Some(rest) = url.strip_prefix("git@") {
+        let (host, _) = rest.split_once(':')?;
+        if host.is_empty() {
+            return None;
+        }
+        return Some(format!("git@{host}:{new_repo_path}{suffix}"));
+    }
+
+    let idx = url.find("://")?;
+    let (scheme, after) = url.split_at(idx + 3);
+    let authority_end = after.find('/')?;
+    let authority = &after[..authority_end];
+    if authority.is_empty() {
+        return None;
+    }
+    Some(format!("{scheme}{authority}/{new_repo_path}{suffix}"))
+}
+
+/// Targets of `warning: redirecting to <url>` lines, in order and deduplicated.
+fn redirect_targets(stderr: &str) -> Vec<String> {
+    let mut targets: Vec<String> = Vec::new();
+    for line in stderr.lines() {
+        let Some(rest) = line.trim().strip_prefix("warning: redirecting to ") else {
+            continue;
+        };
+        let url = rest.trim().trim_end_matches('/');
+        if url.is_empty() || targets.iter().any(|t| t == url) {
+            continue;
+        }
+        targets.push(url.to_string());
+    }
+    targets
+}
+
+/// Map redirect targets back onto configured remotes. A redirect only counts as
+/// a rename when the `owner/repo` part actually changed; scheme-only or
+/// trailing-slash redirects are ignored, and an ambiguous match (several remotes
+/// on the same host) is skipped rather than guessed.
+fn renames_from_redirects(path: &str, remotes: &[RemoteInfo], stderr: &str) -> Vec<RemoteRename> {
+    let mut renames: Vec<RemoteRename> = Vec::new();
+
+    for target in redirect_targets(stderr) {
+        let Some((new_host, new_repo)) = remote_url_repo_key(&target) else {
+            continue;
+        };
+        let mut candidates = remotes.iter().filter(|remote| {
+            remote_url_repo_key(&remote.url)
+                .map(|(host, repo)| host == new_host && repo != new_repo)
+                .unwrap_or(false)
+        });
+        let Some(remote) = candidates.next() else {
+            continue;
+        };
+        if candidates.next().is_some() {
+            continue;
+        }
+        if renames.iter().any(|r| r.remote == remote.name) {
+            continue;
+        }
+        renames.push(RemoteRename {
+            path: path.to_string(),
+            repo_name: repo_name(path),
+            remote: remote.name.clone(),
+            old_url: remote.url.clone(),
+            new_url: target,
+        });
+    }
+
+    renames
+}
+
+/// GitHub serves renamed repositories over SSH without any redirect warning, so
+/// the API is the only signal there. Best-effort: needs `gh` installed and
+/// signed in, and stays quiet otherwise.
+fn github_rename_via_gh(path: &str, remote: &RemoteInfo) -> Option<RemoteRename> {
+    if resolved_gh_exe().is_none() || !is_ssh_remote_url(&remote.url) {
+        return None;
+    }
+
+    let (host, repo_path) = remote_url_repo_key(&remote.url)?;
+    if host != "github.com" || repo_path.matches('/').count() != 1 {
+        return None;
+    }
+
+    let endpoint = format!("repos/{repo_path}");
+    let full_name = run_gh_global(&["api", endpoint.as_str(), "-q", ".full_name"])?;
+    if full_name.matches('/').count() != 1 || full_name.eq_ignore_ascii_case(&repo_path) {
+        return None;
+    }
+
+    Some(RemoteRename {
+        path: path.to_string(),
+        repo_name: repo_name(path),
+        remote: remote.name.clone(),
+        old_url: remote.url.clone(),
+        new_url: rewrite_remote_url_repo_path(&remote.url, &full_name)?,
+    })
+}
+
+static PENDING_RENAMES: OnceLock<Mutex<HashMap<String, Vec<RemoteRename>>>> = OnceLock::new();
+
+fn pending_renames() -> &'static Mutex<HashMap<String, Vec<RemoteRename>>> {
+    PENDING_RENAMES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn remember_pending_renames(path: &str, renames: &[RemoteRename]) {
+    if let Ok(mut cache) = pending_renames().lock() {
+        if renames.is_empty() {
+            cache.remove(path);
+        } else {
+            cache.insert(path.to_string(), renames.to_vec());
+        }
+    }
+}
+
+/// Renames detected during an earlier fetch that the user has not answered yet.
+/// Refresh is deliberately offline, so it replays these instead of re-checking.
+pub fn pending_renames_for(paths: &[String]) -> Vec<RemoteRename> {
+    let Ok(cache) = pending_renames().lock() else {
+        return Vec::new();
+    };
+    paths
+        .iter()
+        .filter_map(|path| cache.get(path))
+        .flat_map(|renames| renames.iter().cloned())
+        .collect()
+}
+
+pub fn dismiss_remote_rename(path: &str, remote: &str) {
+    if let Ok(mut cache) = pending_renames().lock() {
+        let Some(renames) = cache.get_mut(path) else {
+            return;
+        };
+        renames.retain(|r| r.remote != remote);
+        if renames.is_empty() {
+            cache.remove(path);
+        }
+    }
+}
+
+pub fn forget_pending_renames(path: &str) {
+    if let Ok(mut cache) = pending_renames().lock() {
+        cache.remove(path);
+    }
+}
+
+/// Point a remote at its new URL. Only touches remote configuration — never the
+/// working tree or history.
+pub fn apply_remote_rename(path: &str, remote: &str, url: &str) -> Result<RepoStatus, String> {
+    if !crate::store::is_git_repo(path) {
+        return Err(format!("Not a git repository: {path}"));
+    }
+
+    let remote = remote.trim();
+    let url = url.trim();
+    if remote.is_empty() {
+        return Err("Remote name is required".into());
+    }
+    if url.is_empty() {
+        return Err("Remote URL is required".into());
+    }
+    if remote.starts_with('-') || url.starts_with('-') {
+        return Err("Remote name and URL cannot start with '-'".into());
+    }
+    if remote.chars().any(|c| c.is_whitespace()) {
+        return Err("Remote name cannot contain whitespace".into());
+    }
+    if url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("Remote URL cannot contain whitespace".into());
+    }
+    if !list_remotes(path)?.iter().any(|r| r.name == remote) {
+        return Err(format!("Unknown remote: {remote}"));
+    }
+
+    run_git(path, &["remote", "set-url", remote, url])?;
+    dismiss_remote_rename(path, remote);
+    Ok(status_fresh(path))
+}
+
 fn list_commits(path: &str, limit: usize) -> Result<Vec<CommitInfo>, String> {
     let out = run_git(
         path,
@@ -1360,11 +1640,13 @@ fn list_changed_files(path: &str, limit: usize) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_remotes_to_status, cached_remote_provider, find_git_exe, forget_remote_provider,
-        is_valid_default_branch, normalize_git_config_key, normalize_git_config_value,
-        parse_commit_log, parse_decorations, parse_git_bool, parse_status,
-        provider_from_remote_url, provider_from_remotes, remember_remote_provider, remote_url_host,
-        CommitInfo, CommitRef, RemoteInfo, RepoStatus,
+        apply_remotes_to_status, cached_remote_provider, dismiss_remote_rename, find_git_exe,
+        forget_pending_renames, forget_remote_provider, is_valid_default_branch,
+        normalize_git_config_key, normalize_git_config_value, parse_commit_log, parse_decorations,
+        parse_git_bool, parse_status, pending_renames_for, provider_from_remote_url,
+        provider_from_remotes, redirect_targets, remember_pending_renames,
+        remember_remote_provider, remote_url_host, remote_url_repo_path, renames_from_redirects,
+        rewrite_remote_url_repo_path, CommitInfo, CommitRef, RemoteInfo, RemoteRename, RepoStatus,
     };
 
     #[test]
@@ -1630,10 +1912,167 @@ ddd444\0ddd\0root\0Ada\02026-01-01T00:00:00+08:00\0\0
             ]
         );
     }
+
+    #[test]
+    fn normalizes_remote_url_repo_paths() {
+        assert_eq!(
+            remote_url_repo_path("https://github.com/Acme/Repo.git").as_deref(),
+            Some("acme/repo")
+        );
+        assert_eq!(
+            remote_url_repo_path("git@github.com:acme/repo.git").as_deref(),
+            Some("acme/repo")
+        );
+        assert_eq!(
+            remote_url_repo_path("ssh://git@github.com:22/acme/repo").as_deref(),
+            Some("acme/repo")
+        );
+        assert_eq!(
+            remote_url_repo_path("https://user:pw@github.com/acme/repo/").as_deref(),
+            Some("acme/repo")
+        );
+        assert_eq!(remote_url_repo_path("https://github.com/"), None);
+    }
+
+    #[test]
+    fn collects_deduplicated_redirect_targets() {
+        let stderr = "\
+warning: redirecting to https://github.com/new/name.git/
+Fetching origin
+warning: redirecting to https://github.com/new/name.git/
+";
+        assert_eq!(
+            redirect_targets(stderr),
+            vec!["https://github.com/new/name.git".to_string()]
+        );
+        assert!(redirect_targets("fatal: repository not found").is_empty());
+    }
+
+    #[test]
+    fn detects_renamed_remote_from_redirect() {
+        let remotes = vec![RemoteInfo {
+            name: "origin".into(),
+            url: "https://github.com/old/name.git".into(),
+        }];
+        let renames = renames_from_redirects(
+            "/tmp/demo",
+            &remotes,
+            "warning: redirecting to https://github.com/new/name.git/\n",
+        );
+        assert_eq!(
+            renames,
+            vec![RemoteRename {
+                path: "/tmp/demo".into(),
+                repo_name: "demo".into(),
+                remote: "origin".into(),
+                old_url: "https://github.com/old/name.git".into(),
+                new_url: "https://github.com/new/name.git".into(),
+            }]
+        );
+    }
+
+    #[test]
+    fn ignores_redirects_that_keep_the_same_repository() {
+        let remotes = vec![RemoteInfo {
+            name: "origin".into(),
+            url: "http://github.com/old/name".into(),
+        }];
+        // http -> https and a .git suffix are not a rename.
+        assert!(renames_from_redirects(
+            "/tmp/demo",
+            &remotes,
+            "warning: redirecting to https://github.com/old/name.git/\n",
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn skips_ambiguous_redirect_matches() {
+        let remotes = vec![
+            RemoteInfo {
+                name: "origin".into(),
+                url: "https://github.com/old/name.git".into(),
+            },
+            RemoteInfo {
+                name: "upstream".into(),
+                url: "https://github.com/other/name.git".into(),
+            },
+        ];
+        assert!(renames_from_redirects(
+            "/tmp/demo",
+            &remotes,
+            "warning: redirecting to https://github.com/new/name.git/\n",
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn rewrites_repo_path_keeping_url_shape() {
+        assert_eq!(
+            rewrite_remote_url_repo_path("git@github.com:old/name.git", "new/name").as_deref(),
+            Some("git@github.com:new/name.git")
+        );
+        assert_eq!(
+            rewrite_remote_url_repo_path("ssh://git@github.com/old/name", "new/name").as_deref(),
+            Some("ssh://git@github.com/new/name")
+        );
+        assert_eq!(
+            rewrite_remote_url_repo_path("https://github.com/old/name.git", "new/name").as_deref(),
+            Some("https://github.com/new/name.git")
+        );
+    }
+
+    #[test]
+    fn pending_renames_are_dismissed_per_remote() {
+        const PATH: &str = "/tmp/giter-pending-rename-test";
+        let rename = |remote: &str| RemoteRename {
+            path: PATH.into(),
+            repo_name: "demo".into(),
+            remote: remote.into(),
+            old_url: "https://github.com/old/name.git".into(),
+            new_url: "https://github.com/new/name.git".into(),
+        };
+        let paths = vec![PATH.to_string()];
+
+        forget_pending_renames(PATH);
+        remember_pending_renames(PATH, &[rename("origin"), rename("upstream")]);
+        assert_eq!(pending_renames_for(&paths).len(), 2);
+
+        dismiss_remote_rename(PATH, "origin");
+        assert_eq!(
+            pending_renames_for(&paths),
+            vec![rename("upstream")],
+            "dismissing one remote must keep the others pending"
+        );
+
+        dismiss_remote_rename(PATH, "upstream");
+        assert!(pending_renames_for(&paths).is_empty());
+
+        remember_pending_renames(PATH, &[]);
+        assert!(pending_renames_for(&paths).is_empty());
+        forget_pending_renames(PATH);
+    }
 }
 
-pub fn fetch(path: &str) -> Result<(), String> {
-    run_git(path, &["fetch", "--all", "--prune"]).map(|_| ())
+/// `git fetch --all --prune`, plus detection of remotes whose repository was
+/// renamed on the host. Detection is a byproduct of the fetch that already
+/// happened; nothing is changed without the user applying it.
+pub fn fetch_detecting_renames(path: &str) -> (Result<(), String>, Vec<RemoteRename>) {
+    let remotes = list_remotes(path).unwrap_or_default();
+    let (result, stderr) = run_git_capture(path, &["fetch", "--all", "--prune"]);
+
+    let mut renames = renames_from_redirects(path, &remotes, &stderr);
+    for remote in &remotes {
+        if renames.iter().any(|r| r.remote == remote.name) {
+            continue;
+        }
+        if let Some(rename) = github_rename_via_gh(path, remote) {
+            renames.push(rename);
+        }
+    }
+
+    remember_pending_renames(path, &renames);
+    (result, renames)
 }
 
 pub fn pull_ff_only(path: &str) -> Result<(), String> {
@@ -1641,8 +2080,9 @@ pub fn pull_ff_only(path: &str) -> Result<(), String> {
 }
 
 /// Fetch then FF-only pull when clean and behind.
-pub fn update_one(path: &str) -> (BatchProgress, RepoStatus) {
-    if let Err(err) = fetch(path) {
+pub fn update_one(path: &str) -> (BatchProgress, RepoStatus, Vec<RemoteRename>) {
+    let (fetched, renames) = fetch_detecting_renames(path);
+    if let Err(err) = fetched {
         return (
             BatchProgress {
                 path: path.to_string(),
@@ -1650,6 +2090,7 @@ pub fn update_one(path: &str) -> (BatchProgress, RepoStatus) {
                 message: Some(format!("fetch failed: {err}")),
             },
             status(path),
+            renames,
         );
     }
 
@@ -1662,6 +2103,7 @@ pub fn update_one(path: &str) -> (BatchProgress, RepoStatus) {
                 message: Some("Working tree is dirty".into()),
             },
             st,
+            renames,
         );
     }
     if st.upstream.is_none() {
@@ -1672,6 +2114,7 @@ pub fn update_one(path: &str) -> (BatchProgress, RepoStatus) {
                 message: Some("No upstream branch".into()),
             },
             st,
+            renames,
         );
     }
     if st.behind == 0 {
@@ -1682,6 +2125,7 @@ pub fn update_one(path: &str) -> (BatchProgress, RepoStatus) {
                 message: Some("Already up to date".into()),
             },
             st,
+            renames,
         );
     }
 
@@ -1693,6 +2137,7 @@ pub fn update_one(path: &str) -> (BatchProgress, RepoStatus) {
                 message: Some(format!("Fast-forwarded (was behind by {})", st.behind)),
             },
             status(path),
+            renames,
         ),
         Err(err) => (
             BatchProgress {
@@ -1701,6 +2146,7 @@ pub fn update_one(path: &str) -> (BatchProgress, RepoStatus) {
                 message: Some(format!("pull --ff-only failed: {err}")),
             },
             st,
+            renames,
         ),
     }
 }

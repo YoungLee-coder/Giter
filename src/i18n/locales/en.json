@@ -222,6 +222,13 @@
   "detailCommitGraph": "Commit graph",
   "detailNoCommits": "No commits yet.",
   "detailReveal": "Show in folder",
+  "remoteRenameTitle": "Remote repository renamed",
+  "remoteRenameDescription": "These remotes now point to a different repository on the host. Update the remote URL?",
+  "remoteRenameApply": "Update remote",
+  "remoteRenameWorking": "Updating…",
+  "remoteRenameLater": "Later",
+  "remoteRenameApplied": "Remote URL updated",
+  "remoteRenameFailed": "Failed to update remote: {{error}}",
   "sortUpdated": "Order updated",
   "sortUpdateFailed": "Failed to update order"
 }

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { BatchBar, RepoGrid } from "@/components/repo";
+import { RemoteRenameDialog } from "@/components/RemoteRenameDialog";
 import { RepoDetailModal } from "@/components/RepoDetailModal";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -242,6 +243,7 @@ function AppHeader({ dragBarHeight }: { dragBarHeight: number }) {
     setNotice,
     setUpdateInstalling,
     setUpdateProgress,
+    setRemoteRenames,
     selectAll,
     clearSelection,
   } = useAppUi();
@@ -257,6 +259,7 @@ function AppHeader({ dragBarHeight }: { dragBarHeight: number }) {
     clearProgress,
     onNotice: setNotice,
     onError: setError,
+    onRemoteRenames: setRemoteRenames,
   });
 
   const gitStatusLabel =
@@ -543,9 +546,14 @@ function AppMain() {
 }
 
 function AppModals() {
-  const { detailRepo, setDetailRepo } = useAppUi();
+  const { detailRepo, setDetailRepo, remoteRenames, setRemoteRenames } = useAppUi();
 
-  return <RepoDetailModal repo={detailRepo} onClose={() => setDetailRepo(null)} />;
+  return (
+    <>
+      <RepoDetailModal repo={detailRepo} onClose={() => setDetailRepo(null)} />
+      <RemoteRenameDialog renames={remoteRenames} onDone={() => setRemoteRenames([])} />
+    </>
+  );
 }
 
 export default App;

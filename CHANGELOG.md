@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-08-15
+
+### Added
+
+- Detect remotes whose repository was renamed or transferred during Fetch/Update, and offer to apply the new URL in a dialog (Refresh replays a pending detection; it stays offline)
+
 ## [0.5.2] - 2026-08-13
 
 ### Fixed

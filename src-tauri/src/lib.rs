@@ -32,6 +32,8 @@ pub fn run() {
             commands::batch_update,
             commands::repo_detail,
             commands::add_remote,
+            commands::apply_remote_rename,
+            commands::dismiss_remote_rename,
             commands::github_publish_info,
             commands::start_github_login,
             commands::sync_git_identity_from_github,

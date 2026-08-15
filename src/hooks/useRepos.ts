@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import i18n from "@/i18n";
 import { queryKeys, REPOS_STALE_TIME_MS } from "@/lib/query";
-import { api, type RemovedRepo, type RepoStatus } from "@/lib/tauri";
+import { api, type RemoteRename, type RemovedRepo, type RepoStatus } from "@/lib/tauri";
 import { clearProgressQueue } from "@/lib/progressBus";
 
 function mergeRepoStatuses(
@@ -85,6 +85,7 @@ export function useRepoActions(options: {
   clearProgress: () => void;
   onNotice?: (notice: string | null) => void;
   onError?: (error: string | null) => void;
+  onRemoteRenames?: (renames: RemoteRename[]) => void;
 }) {
   const queryClient = useQueryClient();
   const {
@@ -96,6 +97,7 @@ export function useRepoActions(options: {
     clearProgress,
     onNotice,
     onError,
+    onRemoteRenames,
   } = options;
 
   const invalidateRepos = () =>
@@ -162,6 +164,7 @@ export function useRepoActions(options: {
     try {
       const result = await api.refreshStatus();
       setRepos(result.repos);
+      onRemoteRenames?.(result.remoteRenames);
       const notice = removedNotice(result.removed);
       onNotice?.(notice);
       if (notice) toast(notice);
@@ -204,9 +207,10 @@ export function useRepoActions(options: {
     setBusy(true);
     onError?.(null);
     try {
-      const updated =
+      const result =
         mode === "fetch" ? await api.batchFetch(paths) : await api.batchUpdate(paths);
-      setRepos(mergeRepoStatuses(getRepos(), updated));
+      setRepos(mergeRepoStatuses(getRepos(), result.repos));
+      onRemoteRenames?.(result.remoteRenames);
       setSelected(new Set());
     } catch (e) {
       onError?.(String(e));

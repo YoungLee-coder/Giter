@@ -1,5 +1,6 @@
 use crate::git::{
-    self, BatchProgress, GithubPublishInfo, RefreshResult, RemovedRepo, RepoDetail, RepoStatus,
+    self, BatchProgress, BatchResult, GithubPublishInfo, RefreshResult, RemoteRename, RemovedRepo,
+    RepoDetail, RepoStatus,
 };
 use crate::scan;
 use crate::settings::{self, AppInfo, AppSettings};
@@ -132,6 +133,7 @@ pub async fn remove_repos(app: AppHandle, paths: Vec<String>) -> Result<(), Stri
         let remove: HashSet<String> = paths.into_iter().collect();
         for path in &remove {
             git::forget_remote_provider(path);
+            git::forget_pending_renames(path);
         }
         let mut store = store::load(&app)?;
         store.repos.retain(|r| !remove.contains(&r.path));
@@ -191,6 +193,7 @@ pub async fn refresh_status(
         return Ok(RefreshResult {
             repos: Vec::new(),
             removed,
+            remote_renames: Vec::new(),
         });
     }
 
@@ -242,7 +245,12 @@ pub async fn refresh_status(
         repos.sort_by_key(|r| index.get(r.path.as_str()).copied().unwrap_or(usize::MAX));
     }
 
-    Ok(RefreshResult { repos, removed })
+    Ok(RefreshResult {
+        repos,
+        removed,
+        // Refresh stays offline; surface renames an earlier fetch already found.
+        remote_renames: git::pending_renames_for(&order),
+    })
 }
 
 struct RefreshPrep {
@@ -277,6 +285,7 @@ fn prepare_refresh(app: AppHandle, paths: Option<Vec<String>>) -> Result<Refresh
     if !removed_paths.is_empty() {
         for path in &removed_paths {
             git::forget_remote_provider(path);
+            git::forget_pending_renames(path);
         }
         store.repos.retain(|r| !removed_paths.contains(&r.path));
         store::save(&app, &store)?;
@@ -346,7 +355,7 @@ pub async fn batch_fetch(
     app: AppHandle,
     state: State<'_, AppState>,
     paths: Vec<String>,
-) -> Result<Vec<RepoStatus>, String> {
+) -> Result<BatchResult, String> {
     with_batch_lock(&state, async { run_batch(app, paths, false).await }).await
 }
 
@@ -355,7 +364,7 @@ pub async fn batch_update(
     app: AppHandle,
     state: State<'_, AppState>,
     paths: Vec<String>,
-) -> Result<Vec<RepoStatus>, String> {
+) -> Result<BatchResult, String> {
     with_batch_lock(&state, async { run_batch(app, paths, true).await }).await
 }
 
@@ -363,12 +372,15 @@ async fn run_batch(
     app: AppHandle,
     paths: Vec<String>,
     do_update: bool,
-) -> Result<Vec<RepoStatus>, String> {
+) -> Result<BatchResult, String> {
     if !git::git_available() {
         return Err("git is not available in PATH".into());
     }
     if paths.is_empty() {
-        return Ok(vec![]);
+        return Ok(BatchResult {
+            repos: Vec::new(),
+            remote_renames: Vec::new(),
+        });
     }
 
     let concurrency = settings::load(&app)?.concurrency.max(1) as usize;
@@ -394,28 +406,24 @@ async fn run_batch(
                 },
             );
 
-            let (progress, status) = tokio::task::spawn_blocking(move || {
+            let (progress, status, renames) = tokio::task::spawn_blocking(move || {
                 if do_update {
                     git::update_one(&path)
                 } else {
-                    match git::fetch(&path) {
-                        Ok(()) => (
-                            BatchProgress {
-                                path: path.clone(),
-                                stage: "done".into(),
-                                message: Some("Fetched".into()),
-                            },
-                            git::status(&path),
-                        ),
-                        Err(err) => (
-                            BatchProgress {
-                                path: path.clone(),
-                                stage: "error".into(),
-                                message: Some(err),
-                            },
-                            git::status(&path),
-                        ),
-                    }
+                    let (result, renames) = git::fetch_detecting_renames(&path);
+                    let progress = match result {
+                        Ok(()) => BatchProgress {
+                            path: path.clone(),
+                            stage: "done".into(),
+                            message: Some("Fetched".into()),
+                        },
+                        Err(err) => BatchProgress {
+                            path: path.clone(),
+                            stage: "error".into(),
+                            message: Some(err),
+                        },
+                    };
+                    (progress, git::status(&path), renames)
                 }
             })
             .await
@@ -437,25 +445,33 @@ async fn run_batch(
                         last_error: Some(format!("task join error: {e}")),
                         remote_provider: None,
                     },
+                    Vec::new(),
                 )
             });
 
             let _ = app2.emit("batch-progress", progress);
-            status
+            (status, renames)
         }));
     }
 
     let mut repos = Vec::with_capacity(handles.len());
+    let mut remote_renames: Vec<RemoteRename> = Vec::new();
     for handle in handles {
         match handle.await {
-            Ok(status) => repos.push(status),
+            Ok((status, renames)) => {
+                repos.push(status);
+                remote_renames.extend(renames);
+            }
             Err(e) => {
                 return Err(format!("batch join error: {e}"));
             }
         }
     }
 
-    Ok(repos)
+    Ok(BatchResult {
+        repos,
+        remote_renames,
+    })
 }
 
 #[tauri::command]
@@ -466,6 +482,27 @@ pub async fn repo_detail(path: String) -> Result<RepoDetail, String> {
 #[tauri::command]
 pub async fn add_remote(path: String, name: String, url: String) -> Result<RepoDetail, String> {
     run_blocking("add_remote", move || git::add_remote(&path, &name, &url)).await
+}
+
+#[tauri::command]
+pub async fn apply_remote_rename(
+    path: String,
+    remote: String,
+    url: String,
+) -> Result<RepoStatus, String> {
+    run_blocking("apply_remote_rename", move || {
+        git::apply_remote_rename(&path, &remote, &url)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn dismiss_remote_rename(path: String, remote: String) -> Result<(), String> {
+    run_blocking("dismiss_remote_rename", move || {
+        git::dismiss_remote_rename(&path, &remote);
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]

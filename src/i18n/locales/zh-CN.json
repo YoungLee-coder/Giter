@@ -222,6 +222,13 @@
   "detailCommitGraph": "提交图",
   "detailNoCommits": "暂无提交。",
   "detailReveal": "在文件夹中显示",
+  "remoteRenameTitle": "远程仓库已改名",
+  "remoteRenameDescription": "以下远程在服务器上已指向另一个仓库。要更新远程地址吗？",
+  "remoteRenameApply": "更新远程地址",
+  "remoteRenameWorking": "正在更新…",
+  "remoteRenameLater": "稍后",
+  "remoteRenameApplied": "远程地址已更新",
+  "remoteRenameFailed": "更新远程地址失败：{{error}}",
   "sortUpdated": "排序已更新",
   "sortUpdateFailed": "排序更新失败"
 }

@@ -24,6 +24,22 @@ export type RemovedRepo = {
 export type RefreshResult = {
   repos: RepoStatus[];
   removed: RemovedRepo[];
+  remoteRenames: RemoteRename[];
+};
+
+export type BatchResult = {
+  repos: RepoStatus[];
+  remoteRenames: RemoteRename[];
+};
+
+/** A remote whose repository was renamed or transferred on the host. */
+export type RemoteRename = {
+  path: string;
+  repoName: string;
+  /** Remote name, e.g. `origin`. */
+  remote: string;
+  oldUrl: string;
+  newUrl: string;
 };
 
 export type BatchProgress = {
@@ -133,11 +149,15 @@ export const api = {
       path,
       maxDepth: maxDepth ?? null,
     }),
-  batchFetch: (paths: string[]) => invoke<RepoStatus[]>("batch_fetch", { paths }),
-  batchUpdate: (paths: string[]) => invoke<RepoStatus[]>("batch_update", { paths }),
+  batchFetch: (paths: string[]) => invoke<BatchResult>("batch_fetch", { paths }),
+  batchUpdate: (paths: string[]) => invoke<BatchResult>("batch_update", { paths }),
   repoDetail: (path: string) => invoke<RepoDetail>("repo_detail", { path }),
   addRemote: (path: string, name: string, url: string) =>
     invoke<RepoDetail>("add_remote", { path, name, url }),
+  applyRemoteRename: (path: string, remote: string, url: string) =>
+    invoke<RepoStatus>("apply_remote_rename", { path, remote, url }),
+  dismissRemoteRename: (path: string, remote: string) =>
+    invoke<void>("dismiss_remote_rename", { path, remote }),
   githubPublishInfo: () => invoke<GithubPublishInfo>("github_publish_info"),
   startGithubLogin: (protocol: GithubProtocol = "https") =>
     invoke<void>("start_github_login", { protocol }),
