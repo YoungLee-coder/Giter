@@ -1279,8 +1279,9 @@ fn remote_url_host(url: &str) -> Option<String> {
     }
 }
 
-/// `owner/repo` part of a remote URL, lowercased and stripped of `.git` and any
-/// trailing slash, so two spellings of the same repository compare equal.
+/// `owner/repo` part of a remote URL, stripped of `.git` and any trailing
+/// slash. Case is preserved: GitHub renames that only change capitalization are
+/// real renames, so the caller decides whether to compare case-sensitively.
 fn remote_url_repo_path(url: &str) -> Option<String> {
     let url = url.trim();
     if url.is_empty() {
@@ -1306,21 +1307,17 @@ fn remote_url_repo_path(url: &str) -> Option<String> {
     if trimmed.is_empty() {
         None
     } else {
-        Some(trimmed.to_ascii_lowercase())
+        Some(trimmed.to_string())
     }
 }
 
 /// (host, owner/repo) identity used to tell "same repository, different URL"
-/// from "different repository".
+/// from "different repository". Both parts are case-folded, so this only sees
+/// URL spelling differences — not a capitalization-only rename.
 fn remote_url_repo_key(url: &str) -> Option<(String, String)> {
     let host = remote_url_host(url)?.to_ascii_lowercase();
-    let repo = remote_url_repo_path(url)?;
+    let repo = remote_url_repo_path(url)?.to_ascii_lowercase();
     Some((host, repo))
-}
-
-fn is_ssh_remote_url(url: &str) -> bool {
-    let url = url.trim();
-    url.starts_with("git@") || url.starts_with("ssh://") || url.starts_with("git+ssh://")
 }
 
 /// Swap the `owner/repo` part of a remote URL while keeping its scheme, host,
@@ -1404,22 +1401,24 @@ fn renames_from_redirects(path: &str, remotes: &[RemoteInfo], stderr: &str) -> V
     renames
 }
 
-/// GitHub serves renamed repositories over SSH without any redirect warning, so
-/// the API is the only signal there. Best-effort: needs `gh` installed and
-/// signed in, and stays quiet otherwise.
+/// GitHub renames that leave no `warning: redirecting to …` trail: SSH never
+/// emits one, and the smart-HTTP endpoint answers `200` for a capitalization-only
+/// rename instead of a `301`. The API is the only signal in both cases, so every
+/// github.com remote is checked, not just SSH ones. Best-effort: needs `gh`
+/// installed and signed in, and stays quiet otherwise.
 fn github_rename_via_gh(path: &str, remote: &RemoteInfo) -> Option<RemoteRename> {
-    if resolved_gh_exe().is_none() || !is_ssh_remote_url(&remote.url) {
-        return None;
-    }
+    resolved_gh_exe()?;
 
-    let (host, repo_path) = remote_url_repo_key(&remote.url)?;
+    let (host, _) = remote_url_repo_key(&remote.url)?;
+    let repo_path = remote_url_repo_path(&remote.url)?;
     if host != "github.com" || repo_path.matches('/').count() != 1 {
         return None;
     }
 
     let endpoint = format!("repos/{repo_path}");
     let full_name = run_gh_global(&["api", endpoint.as_str(), "-q", ".full_name"])?;
-    if full_name.matches('/').count() != 1 || full_name.eq_ignore_ascii_case(&repo_path) {
+    // Case-sensitive on purpose: `owner/repo` -> `owner/Repo` is a real rename.
+    if full_name.matches('/').count() != 1 || full_name == repo_path {
         return None;
     }
 
@@ -1645,8 +1644,9 @@ mod tests {
         normalize_git_config_key, normalize_git_config_value, parse_commit_log, parse_decorations,
         parse_git_bool, parse_status, pending_renames_for, provider_from_remote_url,
         provider_from_remotes, redirect_targets, remember_pending_renames,
-        remember_remote_provider, remote_url_host, remote_url_repo_path, renames_from_redirects,
-        rewrite_remote_url_repo_path, CommitInfo, CommitRef, RemoteInfo, RemoteRename, RepoStatus,
+        remember_remote_provider, remote_url_host, remote_url_repo_key, remote_url_repo_path,
+        renames_from_redirects, rewrite_remote_url_repo_path, CommitInfo, CommitRef, RemoteInfo,
+        RemoteRename, RepoStatus,
     };
 
     #[test]
@@ -1914,10 +1914,10 @@ ddd444\0ddd\0root\0Ada\02026-01-01T00:00:00+08:00\0\0
     }
 
     #[test]
-    fn normalizes_remote_url_repo_paths() {
+    fn parses_remote_url_repo_paths_preserving_case() {
         assert_eq!(
             remote_url_repo_path("https://github.com/Acme/Repo.git").as_deref(),
-            Some("acme/repo")
+            Some("Acme/Repo")
         );
         assert_eq!(
             remote_url_repo_path("git@github.com:acme/repo.git").as_deref(),
@@ -1932,6 +1932,14 @@ ddd444\0ddd\0root\0Ada\02026-01-01T00:00:00+08:00\0\0
             Some("acme/repo")
         );
         assert_eq!(remote_url_repo_path("https://github.com/"), None);
+    }
+
+    #[test]
+    fn folds_case_when_building_repo_keys() {
+        assert_eq!(
+            remote_url_repo_key("https://GitHub.com/Acme/Repo.git"),
+            remote_url_repo_key("git@github.com:acme/repo")
+        );
     }
 
     #[test]
@@ -2019,6 +2027,12 @@ warning: redirecting to https://github.com/new/name.git/
         assert_eq!(
             rewrite_remote_url_repo_path("https://github.com/old/name.git", "new/name").as_deref(),
             Some("https://github.com/new/name.git")
+        );
+        assert_eq!(
+            rewrite_remote_url_repo_path("https://github.com/acme/giter.git", "acme/Giter")
+                .as_deref(),
+            Some("https://github.com/acme/Giter.git"),
+            "a capitalization-only rename must still produce a new URL"
         );
     }
 

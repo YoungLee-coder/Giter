@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-08-15
+
+### Fixed
+
+- Detect GitHub renames that only change capitalization (`giter` → `Giter`). GitHub answers the smart-HTTP endpoint with `200` instead of a redirect in that case, so the redirect-based detection saw nothing; every github.com remote is now cross-checked against the `gh` API (previously SSH-only), and the comparison is case-sensitive
+
 ## [0.5.3] - 2026-08-15
 
 ### Added
