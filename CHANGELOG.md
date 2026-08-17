@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-08-17
+
+### Fixed
+
+- Pin `default-browser@5.5.0` so pnpm 11 CI supply-chain policy passes after the weekly dependency update
+
 ## [0.5.5] - 2026-08-17
 
 ### Changed
