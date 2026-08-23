@@ -12,6 +12,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 - Weekly dependency updates (pnpm and Cargo lockfile)
 
+### Fixed
+
+- Pin `fast-uri@3.1.5` and keep `@tanstack/react-query@5.101.4` / `@types/react-dom@19.2.4` so pnpm 11 CI supply-chain policy passes
+
 ## [0.5.6] - 2026-08-17
 
 ### Fixed

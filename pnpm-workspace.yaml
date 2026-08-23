@@ -8,6 +8,7 @@ overrides:
   default-browser: 5.5.0
   electron-to-chromium: 1.5.349
   eventsource-parser: 3.0.6
+  fast-uri: 3.1.5
   recast: 0.23.11
   update-browserslist-db: 1.1.3
 
