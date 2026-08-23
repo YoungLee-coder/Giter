@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-08-23
+
+### Changed
+
+- Weekly dependency updates (pnpm and Cargo lockfile)
+
 ## [0.5.6] - 2026-08-17
 
 ### Fixed
