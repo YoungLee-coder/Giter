@@ -12,6 +12,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 - Weekly dependency updates (pnpm and Cargo lockfile)
 
+### Fixed
+
+- Keep `react-hook-form@7.86.0` so pnpm 11 CI supply-chain policy passes
+
 ## [0.5.7] - 2026-08-23
 
 ### Changed
