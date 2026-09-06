@@ -15,6 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 ### Fixed
 
 - Keep `react-hook-form@7.86.0` so pnpm 11 CI supply-chain policy passes
+- Pin `cn@0.2.5` so pnpm 11 CI supply-chain policy passes
 
 ## [0.5.8] - 2026-08-30
 
