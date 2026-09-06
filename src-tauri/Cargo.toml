@@ -2,6 +2,7 @@
 name = "giter"
 version = "0.5.9"
 description = "Giter — local git repository manager with batch fetch and FF-only update"
+readme = "../README.md"
 authors = ["you"]
 edition = "2021"
 default-run = "Giter"
