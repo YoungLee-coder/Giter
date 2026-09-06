@@ -2,6 +2,7 @@
   "name": "giter",
   "private": true,
   "version": "0.5.9",
+  "packageManager": "pnpm@11.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
