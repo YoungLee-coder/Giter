@@ -12,6 +12,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 - Weekly dependency updates (pnpm and Cargo lockfile)
 
+### Fixed
+
+- Keep `react-i18next@17.0.13` and `zod@4.5.4` so pnpm 11 CI supply-chain policy passes
+
 ## [0.5.10] - 2026-09-13
 
 ### Added
