@@ -1,3 +1,13 @@
+mod history;
+mod mutate;
+mod refs;
+mod workspace;
+
+pub use history::*;
+pub use mutate::*;
+pub use refs::*;
+pub use workspace::*;
+
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -97,7 +107,7 @@ fn command_for_exe(exe: &Path) -> Command {
     }
 }
 
-fn git_command() -> Command {
+pub(crate) fn git_command() -> Command {
     if let Some(exe) = resolved_git_exe() {
         return command_for_exe(exe);
     }
@@ -611,7 +621,21 @@ fn resolve_git_path() -> Option<String> {
     resolved_git_exe().map(|p| p.to_string_lossy().into_owned())
 }
 
-fn run_git(cwd: &str, args: &[&str]) -> Result<String, String> {
+pub(crate) fn require_repo(path: &str) -> Result<(), String> {
+    if !crate::store::is_git_repo(path) {
+        return Err(format!("Not a git repository: {path}"));
+    }
+    Ok(())
+}
+
+pub(crate) fn reject_dash(value: &str, label: &str) -> Result<(), String> {
+    if value.starts_with('-') {
+        return Err(format!("{label} must not start with '-'"));
+    }
+    Ok(())
+}
+
+pub(crate) fn run_git(cwd: &str, args: &[&str]) -> Result<String, String> {
     let output = git_command()
         .args(args)
         .current_dir(cwd)
@@ -637,7 +661,7 @@ fn run_git(cwd: &str, args: &[&str]) -> Result<String, String> {
 /// Like [`run_git`], but also hands back stderr on success. `git fetch` reports
 /// HTTP redirects there ("warning: redirecting to …"), which is how a renamed
 /// remote repository shows up.
-fn run_git_capture(cwd: &str, args: &[&str]) -> (Result<(), String>, String) {
+pub(crate) fn run_git_capture(cwd: &str, args: &[&str]) -> (Result<(), String>, String) {
     let output = match git_command().args(args).current_dir(cwd).output() {
         Ok(output) => output,
         Err(e) => return (Err(format!("Failed to run git: {e}")), String::new()),
@@ -658,6 +682,44 @@ fn run_git_capture(cwd: &str, args: &[&str]) -> (Result<(), String>, String) {
         format!("git {:?} failed", args)
     };
     (Err(msg), stderr)
+}
+
+pub(crate) fn run_git_stdin(cwd: &str, args: &[&str], stdin: &str) -> Result<String, String> {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let mut child = git_command()
+        .args(args)
+        .current_dir(cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to run git: {e}"))?;
+
+    if let Some(mut pipe) = child.stdin.take() {
+        pipe.write_all(stdin.as_bytes())
+            .map_err(|e| format!("Failed to write git stdin: {e}"))?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Failed to run git: {e}"))?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let msg = if !stderr.is_empty() {
+            stderr
+        } else if !stdout.is_empty() {
+            stdout
+        } else {
+            format!("git {:?} failed", args)
+        };
+        Err(msg)
+    }
 }
 
 pub fn repo_name(path: &str) -> String {
@@ -1165,7 +1227,7 @@ fn provider_from_remotes(remotes: &[RemoteInfo]) -> Option<String> {
     Some(provider_from_remote_url(url).to_string())
 }
 
-fn apply_remotes_to_status(
+pub(crate) fn apply_remotes_to_status(
     path: &str,
     status: &mut RepoStatus,
     remotes: Result<Vec<RemoteInfo>, String>,
@@ -1186,7 +1248,7 @@ fn apply_remotes_to_status(
     }
 }
 
-fn list_remotes(path: &str) -> Result<Vec<RemoteInfo>, String> {
+pub(crate) fn list_remotes(path: &str) -> Result<Vec<RemoteInfo>, String> {
     let out = run_git(path, &["remote", "-v"])?;
     let mut remotes = Vec::new();
     let mut seen = std::collections::HashSet::new();
@@ -1526,7 +1588,7 @@ fn list_commits(path: &str, limit: usize) -> Result<Vec<CommitInfo>, String> {
     Ok(parse_commit_log(&out))
 }
 
-fn parse_commit_log(out: &str) -> Vec<CommitInfo> {
+pub(crate) fn parse_commit_log(out: &str) -> Vec<CommitInfo> {
     let mut commits = Vec::new();
     for line in out.lines() {
         if line.is_empty() {

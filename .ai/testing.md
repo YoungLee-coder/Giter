@@ -2,7 +2,7 @@
 
 前端：Vitest + Testing Library + jsdom。`pnpm test:unit`；单文件：`pnpm exec vitest run tests/settingsSchema.test.ts`。配置在 `vitest.config.ts`，setup 为 `tests/setupTests.ts`。
 
-Rust：`cargo test --manifest-path src-tauri/Cargo.toml`。单测示例：`cargo test --manifest-path src-tauri/Cargo.toml store::tests::accepts_normal_git_dir`。测试在 `git.rs`（status/provider 解析）与 `store.rs`（`.git` 合法性）。
+Rust：`cargo test --manifest-path src-tauri/Cargo.toml`。单测示例：`cargo test --manifest-path src-tauri/Cargo.toml store::tests::accepts_normal_git_dir`。测试在 `src-tauri/src/git/`（status/provider 解析、工作区 porcelain/hunk）与 `store.rs`（`.git` 合法性）。
 
 目前没有前端组件 E2E；没有 ESLint 脚本。
 

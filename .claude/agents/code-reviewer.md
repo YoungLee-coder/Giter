@@ -10,8 +10,8 @@ You are a code reviewer for Giter. Your job is to catch regressions and conventi
 
 1. P0 — product/safety contract from `.ai/security.md`:
    - `remove_repo` / `remove_repos` deleting files on disk instead of only editing `repos.json`.
-   - Update path using stash, merge, rebase, `reset --hard`, `clean -fd`, or `pull` without `--ff-only`.
-   - New git/gh invocations that bypass `src-tauri/src/git.rs`.
+   - Fleet/batch update path using stash, merge, rebase, `reset --hard`, `clean -fd`, or `pull` without `--ff-only`.
+   - New git/gh invocations that bypass `src-tauri/src/git/`.
    - Updater private keys or tokens committed; credentials written to `repos.json`.
 2. P1 — conventions from `.ai/coding-style.md`:
    - Frontend `invoke` outside `src/lib/tauri.ts` (except `src/lib/theme.ts` → `sync_window_chrome`).
@@ -46,6 +46,7 @@ P2: ...
 ```
 
 End with one line:
+
 - `VERDICT: safe to merge` — no P0/P1.
 - `VERDICT: changes required` — any P0/P1.
 

@@ -30,9 +30,18 @@ type RowGeom = {
 type Props = {
   commits: CommitInfo[];
   formatDate: (iso: string) => string;
+  onSelectCommit?: (commit: CommitInfo) => void;
+  selectedHash?: string;
+  className?: string;
 };
 
-export function CommitGraph({ commits, formatDate }: Props) {
+export function CommitGraph({
+  commits,
+  formatDate,
+  onSelectCommit,
+  selectedHash,
+  className,
+}: Props) {
   const { t } = useI18n();
   const rows = useMemo(() => layoutCommitGraph(commits), [commits]);
   const maxCols = Math.max(1, ...rows.map((row) => row.laneCount));
@@ -89,7 +98,7 @@ export function CommitGraph({ commits, formatDate }: Props) {
   return (
     <ul
       ref={listRef}
-      className="commit-graph soft-panel"
+      className={cn("commit-graph soft-panel", className)}
       aria-label={t("detailCommitGraph")}
     >
       {overlayH > 0 && (
@@ -118,6 +127,8 @@ export function CommitGraph({ commits, formatDate }: Props) {
           row={row}
           maxCols={maxCols}
           formatDate={formatDate}
+          selected={selectedHash === row.commit.hash}
+          onSelect={onSelectCommit}
         />
       ))}
     </ul>
@@ -128,10 +139,14 @@ function CommitGraphRow({
   row,
   maxCols,
   formatDate,
+  selected,
+  onSelect,
 }: {
   row: GraphRow<CommitInfo>;
   maxCols: number;
   formatDate: (iso: string) => string;
+  selected?: boolean;
+  onSelect?: (commit: CommitInfo) => void;
 }) {
   const { commit, column, colorIndex } = row;
   const isHead = commit.refs.some((ref) => ref.kind === "head");
@@ -139,7 +154,7 @@ function CommitGraphRow({
   const color = laneColor(colorIndex);
 
   return (
-    <li className="commit-graph__row">
+    <li className="commit-graph__row" data-selected={selected ? "true" : undefined}>
       <div
         className="commit-graph__lanes"
         style={{ width: maxCols * COL_W }}
@@ -155,7 +170,11 @@ function CommitGraphRow({
           }
         />
       </div>
-      <div className="commit-graph__body">
+      <button
+        type="button"
+        className="commit-graph__body min-w-0 flex-1 border-0 bg-transparent p-0 text-left"
+        onClick={() => onSelect?.(commit)}
+      >
         <div className="commit-graph__title">
           <p className="commit-graph__subject">{commit.subject}</p>
           {refs.length > 0 && (
@@ -173,7 +192,7 @@ function CommitGraphRow({
           <span aria-hidden="true">·</span>
           <span>{formatDate(commit.date)}</span>
         </p>
-      </div>
+      </button>
     </li>
   );
 }

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -12,7 +12,8 @@ import {
 import { toast } from "sonner";
 import { BatchBar, RepoGrid } from "@/components/repo";
 import { RemoteRenameDialog } from "@/components/RemoteRenameDialog";
-import { RepoDetailModal } from "@/components/RepoDetailModal";
+import { CloneInitDialog } from "@/components/workspace/CloneInitDialog";
+import { WorkspacePage } from "@/components/workspace/WorkspacePage";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,13 +57,27 @@ const SettingsPage = lazy(() =>
 
 const DEFAULT_DRAG_BAR_HEIGHT = getDragBarHeight();
 const HEADER_HEIGHT = 48;
+/**
+ * The drag strip is always reserved at the top of the shell. Pages that use the
+ * shared fixed app header (home, settings) also reserve `HEADER_HEIGHT`; the repo
+ * workspace renders its own topbar instead, so it would otherwise leave a 48px
+ * hole between the title bar and its header.
+ */
+const DRAG_BAR_OFFSET = { paddingTop: DEFAULT_DRAG_BAR_HEIGHT } as CSSProperties;
+const PAGE_HEADER_INSET = { paddingTop: HEADER_HEIGHT } as CSSProperties;
 
 function App() {
-  const { isMac, settingsOpen, setSettingsOpen, setAvailableUpdate } = useAppUi();
+  const {
+    isMac,
+    settingsOpen,
+    setSettingsOpen,
+    setAvailableUpdate,
+    detailRepo,
+    setDetailRepo,
+  } = useAppUi();
   const reduceMotion = useReducedMotion();
   const pageTransition = reduceMotion ? { duration: 0 } : fadePage.transition;
   const dragBarHeight = DEFAULT_DRAG_BAR_HEIGHT;
-  const contentTopOffset = dragBarHeight + HEADER_HEIGHT;
   const { t, locale } = useI18n();
   useSettings();
   useReposQuery();
@@ -128,7 +143,7 @@ function App() {
   return (
     <div
       className="flex h-svh flex-col overflow-hidden bg-background text-foreground"
-      style={{ paddingTop: contentTopOffset }}
+      style={DRAG_BAR_OFFSET}
     >
       {dragBarHeight > 0 && (
         <div
@@ -148,7 +163,7 @@ function App() {
           dragBarHeight={dragBarHeight}
           onBack={() => setSettingsOpen(false)}
         />
-      ) : (
+      ) : detailRepo ? null : (
         <AppHeader dragBarHeight={dragBarHeight} />
       )}
       <AnimatePresence mode="wait" initial={false}>
@@ -156,6 +171,7 @@ function App() {
           <motion.div
             key="settings"
             className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            style={PAGE_HEADER_INSET}
             initial={reduceMotion ? false : fadePage.initial}
             animate={fadePage.animate}
             exit={reduceMotion ? undefined : fadePage.exit}
@@ -165,10 +181,22 @@ function App() {
               <SettingsPage onBack={() => setSettingsOpen(false)} />
             </Suspense>
           </motion.div>
+        ) : detailRepo ? (
+          <motion.div
+            key={`workspace:${detailRepo.path}`}
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            initial={reduceMotion ? false : fadePage.initial}
+            animate={fadePage.animate}
+            exit={reduceMotion ? undefined : fadePage.exit}
+            transition={pageTransition}
+          >
+            <WorkspacePage repo={detailRepo} onBack={() => setDetailRepo(null)} />
+          </motion.div>
         ) : (
           <motion.div
             key="home"
             className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            style={PAGE_HEADER_INSET}
             initial={reduceMotion ? false : fadePage.initial}
             animate={fadePage.animate}
             exit={reduceMotion ? undefined : fadePage.exit}
@@ -246,10 +274,12 @@ function AppHeader({ dragBarHeight }: { dragBarHeight: number }) {
     setRemoteRenames,
     selectAll,
     clearSelection,
+    setDetailRepo,
   } = useAppUi();
   const { data: repos = [] } = useReposQuery();
   const { data: gitOk = null } = useGitOkQuery();
   const { settings } = useSettings();
+  const [createMode, setCreateMode] = useState<"clone" | "init" | null>(null);
   const { onAdd, onScan, onRefresh, onRemoveSelected, runBatch } = useRepoActions({
     scanDepth: settings.scanDepth,
     selected,
@@ -409,6 +439,8 @@ function AppHeader({ dragBarHeight }: { dragBarHeight: number }) {
             onSelectAll={() => selectAll(repos.map((r) => r.path))}
             onClearSelection={clearSelection}
             onAdd={() => void onAdd()}
+            onClone={() => setCreateMode("clone")}
+            onInit={() => setCreateMode("init")}
             onScan={() => void onScan()}
             onRefresh={() => void onRefresh()}
             onFetch={() => void runBatch("fetch")}
@@ -417,6 +449,13 @@ function AppHeader({ dragBarHeight }: { dragBarHeight: number }) {
           />
         </div>
       </div>
+      <CloneInitDialog
+        mode={createMode}
+        onOpenChange={(open) => {
+          if (!open) setCreateMode(null);
+        }}
+        onAdded={(repo) => setDetailRepo(repo)}
+      />
     </header>
   );
 }
@@ -546,13 +585,10 @@ function AppMain() {
 }
 
 function AppModals() {
-  const { detailRepo, setDetailRepo, remoteRenames, setRemoteRenames } = useAppUi();
+  const { remoteRenames, setRemoteRenames } = useAppUi();
 
   return (
-    <>
-      <RepoDetailModal repo={detailRepo} onClose={() => setDetailRepo(null)} />
-      <RemoteRenameDialog renames={remoteRenames} onDone={() => setRemoteRenames([])} />
-    </>
+    <RemoteRenameDialog renames={remoteRenames} onDone={() => setRemoteRenames([])} />
   );
 }
 

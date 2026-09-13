@@ -77,6 +77,100 @@ export type RepoDetail = {
   changedFiles: string[];
 };
 
+export type ChangedFile = {
+  path: string;
+  origPath: string | null;
+  kind:
+    | "untracked"
+    | "modified"
+    | "added"
+    | "deleted"
+    | "renamed"
+    | "copied"
+    | "conflicted"
+    | string;
+  staged: boolean;
+  unstaged: boolean;
+  conflicted: boolean;
+  indexStatus: string;
+  worktreeStatus: string;
+};
+
+export type WorkspaceSnapshot = {
+  status: RepoStatus;
+  remotes: RemoteInfo[];
+  operation: "normal" | "merge" | "rebase" | "cherryPick" | "revert" | string;
+  files: ChangedFile[];
+  canAmend: boolean;
+};
+
+export type DiffLine = {
+  kind: "context" | "add" | "del" | string;
+  text: string;
+};
+
+export type DiffHunk = {
+  header: string;
+  oldStart: number;
+  oldCount: number;
+  newStart: number;
+  newCount: number;
+  lines: DiffLine[];
+};
+
+export type FileDiff = {
+  path: string;
+  header: string;
+  binary: boolean;
+  hunks: DiffHunk[];
+};
+
+export type HunkLineInput = {
+  kind: string;
+  text: string;
+  selected: boolean;
+};
+
+export type BranchInfo = {
+  name: string;
+  hash: string;
+  current: boolean;
+  upstream: string | null;
+  remote: boolean;
+};
+
+export type TagInfo = {
+  name: string;
+  hash: string;
+  subject: string;
+};
+
+export type StashEntry = {
+  index: number;
+  selector: string;
+  subject: string;
+};
+
+export type RepoRefs = {
+  branches: BranchInfo[];
+  tags: TagInfo[];
+  stashes: StashEntry[];
+};
+
+export type BlameLine = {
+  hash: string;
+  author: string;
+  date: string;
+  line: string;
+  number: number;
+};
+
+export type CommitDiff = {
+  from: string;
+  to: string;
+  patch: string;
+};
+
 export type ThemePreference = "system" | "light" | "dark";
 
 export type AppSettings = {
@@ -180,4 +274,97 @@ export const api = {
     invoke<GitInfo>("set_git_identity_field", { field, value }),
   setGitConfigField: (field: GitConfigField, value: string) =>
     invoke<GitInfo>("set_git_config_field", { field, value }),
+  cloneRepo: (url: string, dest: string) =>
+    invoke<RepoStatus>("clone_repo", { url, dest }),
+  initRepo: (path: string) => invoke<RepoStatus>("init_repo", { path }),
+  workspaceSnapshot: (path: string) =>
+    invoke<WorkspaceSnapshot>("workspace_snapshot", { path }),
+  repoRefs: (path: string) => invoke<RepoRefs>("repo_refs", { path }),
+  commitsPage: (path: string, skip = 0, limit = 50, search?: string) =>
+    invoke<CommitInfo[]>("commits_page", {
+      path,
+      skip,
+      limit,
+      search: search ?? null,
+    }),
+  fileDiff: (path: string, filePath: string, staged = false) =>
+    invoke<FileDiff>("file_diff", { path, filePath, staged }),
+  stagePaths: (path: string, files: string[]) =>
+    invoke<WorkspaceSnapshot>("stage_paths", { path, files }),
+  unstagePaths: (path: string, files: string[]) =>
+    invoke<WorkspaceSnapshot>("unstage_paths", { path, files }),
+  discardPaths: (path: string, files: string[]) =>
+    invoke<WorkspaceSnapshot>("discard_paths", { path, files }),
+  commitRepo: (path: string, message: string, amend = false) =>
+    invoke<WorkspaceSnapshot>("commit_repo", { path, message, amend }),
+  pushRepo: (path: string, forceWithLease = false) =>
+    invoke<WorkspaceSnapshot>("push_repo", { path, forceWithLease }),
+  pullRepo: (path: string) => invoke<WorkspaceSnapshot>("pull_repo", { path }),
+  fetchRepo: (path: string) => invoke<WorkspaceSnapshot>("fetch_repo", { path }),
+  applyHunk: (
+    path: string,
+    filePath: string,
+    fileHeader: string,
+    hunkHeader: string,
+    lines: HunkLineInput[],
+    reverse = false,
+  ) =>
+    invoke<WorkspaceSnapshot>("apply_hunk", {
+      path,
+      filePath,
+      fileHeader,
+      hunkHeader,
+      lines,
+      reverse,
+    }),
+  createBranch: (path: string, name: string, checkout = true) =>
+    invoke<WorkspaceSnapshot>("create_branch", { path, name, checkout }),
+  checkoutRef: (path: string, name: string) =>
+    invoke<WorkspaceSnapshot>("checkout_ref", { path, name }),
+  renameBranch: (path: string, from: string, to: string) =>
+    invoke<WorkspaceSnapshot>("rename_branch", { path, from, to }),
+  deleteBranch: (path: string, name: string, force = false) =>
+    invoke<WorkspaceSnapshot>("delete_branch", { path, name, force }),
+  setUpstream: (path: string, branch: string, upstream: string) =>
+    invoke<WorkspaceSnapshot>("set_upstream", { path, branch, upstream }),
+  createTag: (path: string, name: string, message?: string, target?: string) =>
+    invoke<WorkspaceSnapshot>("create_tag", {
+      path,
+      name,
+      message: message ?? null,
+      target: target ?? null,
+    }),
+  deleteTag: (path: string, name: string) =>
+    invoke<WorkspaceSnapshot>("delete_tag", { path, name }),
+  pushTags: (path: string) => invoke<WorkspaceSnapshot>("push_tags", { path }),
+  mergeRef: (path: string, name: string) =>
+    invoke<WorkspaceSnapshot>("merge_ref", { path, name }),
+  rebaseOnto: (path: string, onto: string) =>
+    invoke<WorkspaceSnapshot>("rebase_onto", { path, onto }),
+  stashPush: (path: string, message?: string) =>
+    invoke<WorkspaceSnapshot>("stash_push", { path, message: message ?? null }),
+  stashApply: (path: string, selector: string, pop = false) =>
+    invoke<WorkspaceSnapshot>("stash_apply", { path, selector, pop }),
+  stashDrop: (path: string, selector: string) =>
+    invoke<WorkspaceSnapshot>("stash_drop", { path, selector }),
+  conflictTake: (path: string, filePath: string, side: "ours" | "theirs") =>
+    invoke<WorkspaceSnapshot>("conflict_take", { path, filePath, side }),
+  markResolved: (path: string, filePath: string) =>
+    invoke<WorkspaceSnapshot>("mark_resolved", { path, filePath }),
+  continueOperation: (path: string) =>
+    invoke<WorkspaceSnapshot>("continue_operation", { path }),
+  abortOperation: (path: string) =>
+    invoke<WorkspaceSnapshot>("abort_operation", { path }),
+  fileHistory: (path: string, filePath: string, skip = 0, limit = 50) =>
+    invoke<CommitInfo[]>("file_history", { path, filePath, skip, limit }),
+  blameFile: (path: string, filePath: string) =>
+    invoke<BlameLine[]>("blame_file", { path, filePath }),
+  commitPatch: (path: string, from: string, to: string) =>
+    invoke<CommitDiff>("commit_patch", { path, from, to }),
+  cherryPick: (path: string, hash: string) =>
+    invoke<WorkspaceSnapshot>("cherry_pick", { path, hash }),
+  revertCommit: (path: string, hash: string) =>
+    invoke<WorkspaceSnapshot>("revert_commit", { path, hash }),
+  resetTo: (path: string, hash: string, mode: "soft" | "mixed" | "hard") =>
+    invoke<WorkspaceSnapshot>("reset_to", { path, hash, mode }),
 };

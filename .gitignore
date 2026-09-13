@@ -36,6 +36,9 @@ coverage/
 # Tauri updater signing keys (never commit the private key)
 .tauri-keys/
 
+# Local UI review screenshots (design scratch space, never committed)
+.preview/
+
 # Editor
 .vscode/*
 !.vscode/extensions.json

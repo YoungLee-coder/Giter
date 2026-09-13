@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.5.10] - 2026-09-13
+
+### Added
+
+- Single-repo workspace: clone, init, push, stage/commit, branches, tags, merge/rebase/stash, conflicts, file history, and blame
+- Dashboard Clone and Init alongside Add / Scan
+
+### Changed
+
+- Opening a repository goes to a full workspace page instead of a detail dialog
+- Fleet batch Fetch / Update still only fast-forward; stash / merge / rebase stay workspace-only
+- Workspace branch/tag/stash data is prefetched right after the workspace snapshot (serialized through the per-repo lock) and no longer polls on its own timer, so switching to the Branches tab renders from cache
+- Branches tab shows a loading row instead of flashing empty branches/tags/stashes before the first response lands
+
+### Fixed
+
+- Branch details no longer take an extra second, or a visible blank moment, when opening a repository: the per-repo lock now queues same-repo commands instead of rejecting them, and branch data no longer waits for the Branches tab to be opened
+
 ## [0.5.9] - 2026-09-06
 
 ### Changed

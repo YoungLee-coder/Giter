@@ -111,15 +111,21 @@ fn is_valid_git_dir(git_dir: &Path) -> bool {
 mod tests {
     use super::*;
     use std::io::Write;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
+    /// Parallel tests share a process id and can land on the same nanosecond, so
+    /// this counter is what actually keeps their temp trees apart. Without it one
+    /// test's `remove_dir_all` can delete a sibling's directory mid-assert.
     fn tmp_dir() -> PathBuf {
+        static SEQ: AtomicUsize = AtomicUsize::new(0);
         let dir = std::env::temp_dir().join(format!(
-            "giter-repo-test-{}-{}",
+            "giter-repo-test-{}-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_nanos()
+                .as_nanos(),
+            SEQ.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir_all(&dir).unwrap();
         dir

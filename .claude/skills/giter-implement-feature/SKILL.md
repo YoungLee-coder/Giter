@@ -14,4 +14,4 @@ Implement a new feature following the conventions defined in `.ai/`:
 5. **Review**: if the change is non-trivial, invoke the code-reviewer and/or architect subagent before considering it done.
 6. **Memory**: if you discovered a stable convention or gotcha missing from `.ai/`, propose saving it (confirm before writing — see `/giter-remember`).
 
-New IPC: add the command in `src-tauri/src/commands.rs`, register it in `src-tauri/src/lib.rs`, and expose it on `api` in `src/lib/tauri.ts` with matching camelCase types. User-facing copy must land in both `src/i18n/locales/en.json` and `zh-CN.json`. Git work stays in `git.rs` — no stash / merge / rebase. Do not delete user repos on disk.
+New IPC: add the command in `src-tauri/src/commands.rs`, register it in `src-tauri/src/lib.rs`, and expose it on `api` in `src/lib/tauri.ts` with matching camelCase types. User-facing copy must land in both `src/i18n/locales/en.json` and `zh-CN.json`. Git/gh 只放在 `src-tauri/src/git/`。舱队批量路径禁止 stash / merge / rebase；工作区写入必须走 git 模块封装。不要删除用户磁盘上的仓库目录。

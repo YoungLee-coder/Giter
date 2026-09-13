@@ -17,16 +17,16 @@ Project memory lives in `.ai/` — shared by Claude Code, opencode, and Cursor. 
 
 ## Routing
 
-| Kind of memory | Target file |
-|---|---|
-| Coding convention, naming, helpers, gotchas | `.ai/coding-style.md` |
-| Build / test / lint / format commands, verification steps, release, GitHub ops | `.ai/workflow.md` |
-| Test framework, run-one-test, per-area test commands | `.ai/testing.md` |
-| Repo map, layers, entry points, hotspot files | `.ai/architecture.md` |
-| Safety, auth, destructive ops, secrets | `.ai/security.md` (create only if applicable) |
-| Project background, response language | `.ai/project.md` |
-| Personal or machine-only preference | `CLAUDE.local.md` / `AGENTS.local.md` (gitignored) |
-| Cursor-only agent behavior (not a shared project fact) | `.cursor/rules/project-context.mdc` Cursor-specific notes |
+| Kind of memory                                                                 | Target file                                               |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| Coding convention, naming, helpers, gotchas                                    | `.ai/coding-style.md`                                     |
+| Build / test / lint / format commands, verification steps, release, GitHub ops | `.ai/workflow.md`                                         |
+| Test framework, run-one-test, per-area test commands                           | `.ai/testing.md`                                          |
+| Repo map, layers, entry points, hotspot files                                  | `.ai/architecture.md`                                     |
+| Safety, auth, destructive ops, secrets                                         | `.ai/security.md` (create only if applicable)             |
+| Project background, response language                                          | `.ai/project.md`                                          |
+| Personal or machine-only preference                                            | `CLAUDE.local.md` / `AGENTS.local.md` (gitignored)        |
+| Cursor-only agent behavior (not a shared project fact)                         | `.cursor/rules/project-context.mdc` Cursor-specific notes |
 
 If `.ai/security.md` does not exist and the memory is safety-related, ask whether to create it before writing.
 
@@ -41,4 +41,4 @@ When you notice a **stable** fact missing from `.ai/` that would help future age
 - If the user says yes, follow the user-invoked workflow (draft → confirm → write).
 - If the user declines, continue without saving.
 
-Prefer adding gotchas to `.ai/coding-style.md` with a one-line why. Git/disk/token safety goes to `.ai/security.md`. Keep entries imperative and path-specific (e.g. `src/lib/tauri.ts`, `git.rs`).
+Prefer adding gotchas to `.ai/coding-style.md` with a one-line why. Git/disk/token safety goes to `.ai/security.md`. Keep entries imperative and path-specific (e.g. `src/lib/tauri.ts`, `src-tauri/src/git/`).

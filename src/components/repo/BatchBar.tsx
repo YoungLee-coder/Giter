@@ -20,6 +20,8 @@ type Props = {
   onSelectAll: () => void;
   onClearSelection: () => void;
   onAdd: () => void;
+  onClone: () => void;
+  onInit: () => void;
   onScan: () => void;
   onRefresh: () => void;
   onFetch: () => void;
@@ -37,6 +39,8 @@ export function BatchBar({
   onSelectAll,
   onClearSelection,
   onAdd,
+  onClone,
+  onInit,
   onScan,
   onRefresh,
   onFetch,
@@ -91,6 +95,8 @@ export function BatchBar({
             <DropdownMenuContent align="end" className="min-w-40">
               <DropdownMenuGroup>
                 <DropdownMenuItem onClick={onAdd}>{t("addRepo")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={onClone}>{t("clone")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={onInit}>{t("initRepo")}</DropdownMenuItem>
                 <DropdownMenuItem onClick={onScan}>{t("scanFolder")}</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>

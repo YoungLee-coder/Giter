@@ -4,9 +4,9 @@
 
 ## English
 
-Desktop app for managing local Git repositories on macOS and Windows. Add or scan repos, then batch **Fetch** or **Update** (`fetch` → `pull --ff-only`).
+Desktop Git client for macOS and Windows. The home screen is a **fleet dashboard**: add or scan repos, then batch **Fetch** or **Update** (`fetch` → `pull --ff-only`). Open a repo to enter a **workspace** for day-to-day Git (stage, commit, push, branches, history, merge / rebase / stash, conflicts).
 
-It shells out to your system `git`, so SSH agents, Keychain, and Credential Manager work as usual. Dirty trees, missing upstreams, and non-fast-forward cases are skipped with a visible reason. No stash, merge, or rebase automation.
+It shells out to your system `git`, so SSH agents, Keychain, and Credential Manager work as usual. Batch Update skips dirty trees, missing upstreams, and non-fast-forward cases with a visible reason. Stash, merge, and rebase are workspace-only, never run from the batch bar.
 
 ### Install
 
@@ -14,11 +14,11 @@ It shells out to your system `git`, so SSH agents, Keychain, and Credential Mana
 
 Grab a build from [Releases](../../releases/latest):
 
-| Platform | Artifact |
-|----------|----------|
-| macOS Apple Silicon | `.dmg` (aarch64) |
-| macOS Intel | `.dmg` (x86_64) |
-| Windows | NSIS (`.exe`) or MSI |
+| Platform            | Artifact             |
+| ------------------- | -------------------- |
+| macOS Apple Silicon | `.dmg` (aarch64)     |
+| macOS Intel         | `.dmg` (x86_64)      |
+| Windows             | NSIS (`.exe`) or MSI |
 
 Builds are unsigned. On modern macOS the app may show as “damaged” after download because of the quarantine flag. Clear it once, then open normally:
 
@@ -28,11 +28,12 @@ xattr -cr /Applications/Giter.app
 
 ### What it does
 
-- **Add** a folder that contains a real `.git`, or **Scan** a parent folder for repos
+- **Add** a folder that contains a real `.git`, **Clone** a URL, **Init** a new repo, or **Scan** a parent folder
 - **Fetch**: `git fetch --all --prune` on the selection
 - **Update**: fetch, then `git pull --ff-only` only when the tree is clean, an upstream exists, and the branch is behind
 - Parallel jobs (default 4, configurable 1-16) with per-repo progress
-- Repo detail: remotes, recent commits, working-tree changes, reveal in Finder/Explorer
+- **Workspace**: stage/commit/push, branches and tags, commit graph, merge/rebase/stash, conflict resolution, file history and blame
+- Remotes, GitHub publish, reveal in Finder/Explorer
 - EN / 中文 UI; light, dark, or system theme
 - In-app updates: Settings → About → **Check for updates**, or a startup banner when a newer release is available
 
@@ -42,13 +43,13 @@ The app stores paths only in `repos.json` under the app data directory. **Remove
 
 ### Update rules
 
-| Situation | Result |
-|-----------|--------|
-| Dirty working tree | Skipped |
-| No upstream | Skipped |
-| Already up to date | Skipped |
-| Clean, has upstream, behind &gt; 0 | Fast-forward |
-| Fetch / `pull --ff-only` failure | Error shown in the UI |
+| Situation                          | Result                |
+| ---------------------------------- | --------------------- |
+| Dirty working tree                 | Skipped               |
+| No upstream                        | Skipped               |
+| Already up to date                 | Skipped               |
+| Clean, has upstream, behind &gt; 0 | Fast-forward          |
+| Fetch / `pull --ff-only` failure   | Error shown in the UI |
 
 ### Develop
 
@@ -77,9 +78,9 @@ Tauri 2 (Rust) · Vite + React + TypeScript · pnpm · TanStack Query · i18next
 
 ## 中文
 
-macOS / Windows 上管理本地 Git 仓库的桌面应用。添加或扫描仓库后，可批量 **Fetch** 或 **更新**（`fetch` → `pull --ff-only`）。
+macOS / Windows 上的桌面 Git 客户端。首页是 **舱队仪表盘**：添加或扫描仓库后，可批量 **Fetch** 或 **更新**（`fetch` → `pull --ff-only`）。点进仓库进入 **工作区**，做日常 Git（暂存提交、分支、历史、merge / rebase / stash、冲突解决）。
 
-走系统里的 `git`，SSH agent、钥匙串、Credential Manager 都照常可用。工作区不干净、没有上游、无法快进时会跳过，并给出原因。不做 stash / merge / rebase。
+走系统里的 `git`，SSH agent、钥匙串、Credential Manager 都照常可用。批量更新在工作区不干净、没有上游、无法快进时会跳过，并给出原因。stash / merge / rebase 只出现在工作区，不会从批量栏执行。
 
 ### 安装
 
@@ -87,11 +88,11 @@ macOS / Windows 上管理本地 Git 仓库的桌面应用。添加或扫描仓�
 
 从 [Releases](../../releases/latest) 下载：
 
-| 平台 | 产物 |
-|------|------|
-| macOS Apple Silicon | `.dmg`（aarch64） |
-| macOS Intel | `.dmg`（x86_64） |
-| Windows | NSIS（`.exe`）或 MSI |
+| 平台                | 产物                 |
+| ------------------- | -------------------- |
+| macOS Apple Silicon | `.dmg`（aarch64）    |
+| macOS Intel         | `.dmg`（x86_64）     |
+| Windows             | NSIS（`.exe`）或 MSI |
 
 构建未签名。较新的 macOS 下载后可能提示「已损坏」，是隔离属性导致的。先清除一次，再正常打开：
 
@@ -101,11 +102,12 @@ xattr -cr /Applications/Giter.app
 
 ### 能做什么
 
-- **添加** 含真实 `.git` 的文件夹，或 **扫描** 父目录下的仓库
+- **添加** 含真实 `.git` 的文件夹，**克隆** URL，**初始化** 新仓库，或 **扫描** 父目录
 - **Fetch**：对选中仓库执行 `git fetch --all --prune`
 - **更新**：先 fetch，仅在工作区干净、有上游、且落后时再执行 `git pull --ff-only`
 - 并行任务（默认 4，可调 1-16），每个仓库单独显示进度
-- 仓库详情：远程、最近提交、工作区改动，可在 Finder / 资源管理器中显示
+- **工作区**：暂存/提交/推送、分支与标签、提交图、merge/rebase/stash、冲突解决、文件历史与 blame
+- 远程、发布到 GitHub，可在 Finder / 资源管理器中显示
 - 界面 EN / 中文；浅色、深色或跟随系统
 - 应用内更新：设置 → 关于 → **检查更新**；启动时若有新版本会显示可关闭提示条
 
@@ -115,12 +117,12 @@ xattr -cr /Applications/Giter.app
 
 ### 更新规则
 
-| 情况 | 结果 |
-|------|------|
-| 工作区有未提交更改 | 跳过 |
-| 无上游分支 | 跳过 |
-| 已是最新 | 跳过 |
-| 干净、有上游、落后 &gt; 0 | 快进 |
+| 情况                          | 结果         |
+| ----------------------------- | ------------ |
+| 工作区有未提交更改            | 跳过         |
+| 无上游分支                    | 跳过         |
+| 已是最新                      | 跳过         |
+| 干净、有上游、落后 &gt; 0     | 快进         |
 | Fetch / `pull --ff-only` 失败 | 界面显示错误 |
 
 ### 开发

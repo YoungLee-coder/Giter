@@ -5,5 +5,8 @@ export const queryKeys = {
   appInfo: ["appInfo"] as const,
   gitInfo: ["gitInfo"] as const,
   repoDetail: (path: string) => ["repoDetail", path] as const,
+  workspace: (path: string) => ["workspace", path] as const,
+  repoRefs: (path: string) => ["repoRefs", path] as const,
+  commits: (path: string) => ["commits", path] as const,
   githubPublishInfo: ["githubPublishInfo"] as const,
 };
