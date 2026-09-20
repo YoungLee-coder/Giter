@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 - Keep `react-i18next@17.0.13` and `zod@4.5.4` so pnpm 11 CI supply-chain policy passes
 - Keep `react-hook-form@7.86.0` so pnpm 11 CI supply-chain policy passes
 - Keep `@tauri-apps/cli@2.11.4`, `@tauri-apps/plugin-updater@2.11.0`, and `jsdom@30.0.1` so pnpm 11 CI supply-chain policy passes
+- Pin `tauri-plugin-updater` Rust crate to 2.11.0 to match `@tauri-apps/plugin-updater` npm package
 
 ## [0.5.11] - 2026-09-13
 
