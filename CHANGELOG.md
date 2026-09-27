@@ -14,6 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ### Fixed
 
+- Revert unintended Tauri Rust crate bumps in `Cargo.lock` so npm `@tauri-apps/*` packages stay aligned with `tauri build` version checks
 - Pin `tauri-plugin-updater` Rust crate to 2.11.0 to match `@tauri-apps/plugin-updater` npm package
 - Keep `react-i18next@17.0.13`, `zod@4.5.4`, `react-hook-form@7.86.0`, `@tauri-apps/cli@2.11.4`, `@tauri-apps/plugin-updater@2.11.0`, and `jsdom@30.0.1` so pnpm 11 CI supply-chain policy passes
 
