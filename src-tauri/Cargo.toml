@@ -7,6 +7,9 @@ authors = ["you"]
 edition = "2021"
 default-run = "Giter"
 
+[package.metadata.release]
+workflow = "release"
+
 [[bin]]
 name = "Giter"
 path = "src/main.rs"
