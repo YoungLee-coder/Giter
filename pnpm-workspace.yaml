@@ -5,6 +5,7 @@ allowBuilds:
   esbuild: true
 
 overrides:
+  hono: 4.13.7
   cn: 0.2.5
   default-browser: 5.5.0
   electron-to-chromium: 1.5.349
