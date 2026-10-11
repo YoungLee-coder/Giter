@@ -6,6 +6,7 @@ allowBuilds:
 
 overrides:
   hono: 4.13.7
+  ip-address: 10.7.3
   cn: 0.2.5
   default-browser: 5.5.0
   electron-to-chromium: 1.5.349
