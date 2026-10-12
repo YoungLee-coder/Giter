@@ -75,7 +75,12 @@ export function BranchesPanel({
   const [publishName, setPublishName] = useState("");
   const locals = branches.filter((branch) => !branch.remote);
   const remoteBranches = branches.filter((branch) => branch.remote);
-  const loadingRow = <EmptyRow icon={<LoaderCircleIcon className="animate-spin" />} text={t("workspaceLoading")} />;
+  const loadingRow = (
+    <EmptyRow
+      icon={<LoaderCircleIcon className="animate-spin" />}
+      text={t("workspaceLoading")}
+    />
+  );
 
   const submitBranch = (event: FormEvent) => {
     event.preventDefault();
