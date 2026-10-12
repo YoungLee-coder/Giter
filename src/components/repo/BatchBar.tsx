@@ -1,6 +1,6 @@
 import { ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { CheckboxMark } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,11 +62,8 @@ export function BatchBar({
           else onSelectAll();
         }}
       >
-        <Checkbox
+        <CheckboxMark
           checked={allSelected ? true : someSelected ? "indeterminate" : false}
-          tabIndex={-1}
-          className="pointer-events-none"
-          aria-hidden="true"
         />
         {t("selectAll")}
       </Button>
