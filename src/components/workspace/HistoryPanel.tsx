@@ -65,7 +65,7 @@ export function HistoryPanel({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("workspaceSearch")}
-              className="h-7 pr-7 pl-7 text-xs"
+              className="workspace-search h-7 pr-7 pl-7"
               disabled={busy}
               onKeyDown={(event) => {
                 if (event.key === "Enter") onSearch(query);
@@ -87,7 +87,7 @@ export function HistoryPanel({
             ) : null}
           </span>
         </div>
-        <div className="giter-scroll min-h-0 flex-1 overflow-auto p-2">
+        <div className="giter-scroll min-h-0 flex-1 overflow-auto">
           {commits.length === 0 ? (
             <div className="workspace-empty">
               <span className="workspace-empty__icon">

@@ -6,7 +6,6 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowUpCircleIcon,
   CheckIcon,
-  ChevronRightIcon,
   CircleHelpIcon,
   ExternalLinkIcon,
   GitCommitHorizontalIcon,
@@ -134,8 +133,6 @@ export function SettingsPage({ onBack }: Props) {
     updateState.kind === "checking" ||
     updateState.kind === "downloading" ||
     updateState.kind === "installing";
-
-  const activeTab = TABS.find((item) => item.id === tab) ?? TABS[0];
 
   const loadAppInfo = async () => {
     const seq = ++appInfoSeq.current;
@@ -283,44 +280,34 @@ export function SettingsPage({ onBack }: Props) {
     <div className="settings-shell flex min-h-0 flex-1 overflow-hidden">
       <aside className="settings-sidebar" aria-label={t("settingsTitle")}>
         <nav className="settings-nav">
-          {TABS.map(({ id, labelKey, Icon }) => {
-            const active = tab === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                className="settings-nav-item"
-                data-active={active ? "true" : "false"}
-                aria-current={active ? "page" : undefined}
-                onClick={() => setTab(id)}
-              >
-                <span className="settings-nav-icon">
-                  <Icon className="size-4" strokeWidth={1.75} />
-                </span>
-                <span className="settings-nav-label">{t(labelKey)}</span>
-              </button>
-            );
-          })}
+          {TABS.map(({ id, labelKey, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className="settings-nav-item"
+              aria-current={tab === id ? "page" : undefined}
+              onClick={() => setTab(id)}
+            >
+              {tab === id ? (
+                <motion.span
+                  layoutId="settings-nav-plate"
+                  className="settings-nav-plate"
+                  transition={
+                    reduceMotion
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: 380, damping: 32 }
+                  }
+                />
+              ) : null}
+              <Icon className="settings-nav-icon" strokeWidth={1.75} />
+              <span className="settings-nav-label">{t(labelKey)}</span>
+            </button>
+          ))}
         </nav>
       </aside>
 
       <div className="settings-body giter-scroll min-h-0 flex-1 overflow-y-auto">
         <div className="settings-content">
-          <nav className="settings-mobile-nav" aria-label={t("settingsTitle")}>
-            {TABS.map(({ id, labelKey }) => (
-              <button
-                key={id}
-                type="button"
-                className="settings-mobile-tab"
-                data-active={tab === id ? "true" : "false"}
-                aria-current={tab === id ? "page" : undefined}
-                onClick={() => setTab(id)}
-              >
-                {t(labelKey)}
-              </button>
-            ))}
-          </nav>
-
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={tab}
@@ -330,22 +317,6 @@ export function SettingsPage({ onBack }: Props) {
               exit={reduceMotion ? undefined : settingsPane.exit}
               transition={reduceMotion ? { duration: 0 } : settingsPane.transition}
             >
-              <header className="settings-pane-header">
-                <div className="settings-pane-icon">
-                  <activeTab.Icon className="size-5" strokeWidth={1.75} />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="settings-pane-title">{t(activeTab.labelKey)}</h2>
-                  <p className="settings-pane-desc text-pretty">
-                    {tab === "general"
-                      ? t("settingsGeneralHint")
-                      : tab === "git"
-                        ? t("gitMenuHint")
-                        : t("aboutMenuHint")}
-                  </p>
-                </div>
-              </header>
-
               {tab === "general" ? (
                 <GeneralTab
                   form={form}
@@ -402,10 +373,10 @@ function GeneralTab({
   const { t } = useI18n();
 
   return (
-    <div className="settings-section space-y-5">
+    <div className="settings-section">
       <section aria-label={t("settingsSectionAppearance")}>
         <SettingsSectionLabel>{t("settingsSectionAppearance")}</SettingsSectionLabel>
-        <div className="settings-field-group soft-panel">
+        <div className="settings-group">
           <SettingsFieldRow
             title={t("langLabel")}
             description={t("settingsLanguageDescription")}
@@ -427,7 +398,7 @@ function GeneralTab({
         onSubmit={form.handleSubmit(() => undefined)}
       >
         <SettingsSectionLabel>{t("settingsSectionScanning")}</SettingsSectionLabel>
-        <div className="settings-field-group soft-panel">
+        <div className="settings-group">
           <SettingsFieldRow title={t("scanDepthLabel")} description={t("scanDepthHint")}>
             <NumberStepper
               id={scanDepthId}
@@ -517,26 +488,20 @@ function GitTab({
   };
 
   return (
-    <div className="settings-section space-y-5">
-      <div
-        className={cn(
-          "settings-status-card",
-          available ? "settings-status-card--ok" : "settings-status-card--warn",
-        )}
-      >
-        <div className="min-w-0">
-          <div className="settings-status-card-title">{t("settingsSectionGit")}</div>
-          <p className="settings-status-card-desc text-pretty">
-            {available ? t("gitMenuHint") : t("gitMissingBanner")}
-          </p>
+    <div className="settings-section">
+      {available ? null : (
+        <div className="settings-status-card">
+          <div className="min-w-0">
+            <div className="settings-status-card-title">{t("settingsSectionGit")}</div>
+            <p className="settings-status-card-desc text-pretty">
+              {t("gitMissingBanner")}
+            </p>
+          </div>
+          <Badge variant="destructive" className="shrink-0 rounded-[6px]">
+            {t("gitMissing")}
+          </Badge>
         </div>
-        <Badge
-          variant={available ? "secondary" : "destructive"}
-          className="shrink-0 rounded-[6px]"
-        >
-          {available ? t("gitReady") : t("gitMissing")}
-        </Badge>
-      </div>
+      )}
 
       <GitInfoPanel
         loading={gitLoading}
@@ -694,8 +659,7 @@ function GithubAccountPanel({
         )}
       >
         <div className="min-w-0">
-          <div className="settings-status-card-title">{t("settingsGitGithub")}</div>
-          <p className="settings-status-card-desc text-pretty">{description}</p>
+          <p className="settings-status-card-title text-pretty">{description}</p>
           {error && (
             <p className="mt-2 text-xs text-destructive text-pretty" title={error}>
               {error}
@@ -867,7 +831,7 @@ function AboutTab({
         : t("checkForUpdates");
 
   return (
-    <div className="settings-section space-y-5">
+    <div className="settings-section">
       <div className="settings-about-hero">
         <div className="settings-about-brand">
           <img
@@ -878,24 +842,19 @@ function AboutTab({
             height={72}
             alt=""
           />
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <div className="font-heading text-xl font-semibold tracking-tight">
-              {name}
-            </div>
-            <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="font-mono text-base font-bold tracking-tight">{name}</div>
+            <p className="text-[0.8125rem] text-muted-foreground text-pretty">
               {t("tagline")}
             </p>
-            <Badge variant="secondary" className="w-fit rounded-[6px] font-mono text-xs">
-              {t("aboutVersion", { version: version ?? "…" })}
-            </Badge>
           </div>
         </div>
       </div>
 
       <section aria-label={t("settingsUpdates")}>
         <SettingsSectionLabel>{t("settingsUpdates")}</SettingsSectionLabel>
-        <div className="settings-field-group soft-panel">
-          <div className="settings-field-row settings-field-row--stack">
+        <div className="settings-group">
+          <div className="settings-field-row settings-field-row--end">
             <div className="settings-field-row-label">
               <span className="settings-field-row-title">
                 {updateState.kind === "available"
@@ -904,9 +863,11 @@ function AboutTab({
                     })
                   : t("aboutVersion", { version: version ?? "…" })}
               </span>
-              <span className="settings-field-row-desc text-pretty">
-                {updateStatus ?? t("aboutOpenReleasesHint")}
-              </span>
+              {updateStatus && (
+                <span className="settings-field-row-desc text-pretty">
+                  {updateStatus}
+                </span>
+              )}
             </div>
             <div className="settings-field-row-control">
               <Button
@@ -954,7 +915,7 @@ function AboutTab({
 
       <section aria-label={t("aboutLabel")}>
         <SettingsSectionLabel>{t("aboutLabel")}</SettingsSectionLabel>
-        <div className="settings-field-group soft-panel">
+        <div className="settings-group">
           <SettingsLinkRow
             title={t("aboutOpenGithub")}
             description={GITHUB_URL.replace(/^https?:\/\//, "")}
@@ -1092,7 +1053,7 @@ function GitSegmentedField({
         }}
         aria-label={title}
         aria-busy={saving}
-        className="mac-segment w-full"
+        className="mac-segment"
       >
         {options.map((option) => (
           <ToggleGroupItem
@@ -1129,8 +1090,7 @@ function SettingsLinkRow({
         )}
       </span>
       <span className="settings-link-row-meta">
-        <ExternalLinkIcon className="size-3.5 opacity-60" />
-        <ChevronRightIcon className="size-4 opacity-45" />
+        <ExternalLinkIcon className="size-3.5" />
       </span>
     </button>
   );
@@ -1290,10 +1250,10 @@ function GitInfoPanel({
   };
 
   return (
-    <div className="space-y-5">
+    <>
       <section>
         <SettingsSectionLabel>{t("settingsGitInstall")}</SettingsSectionLabel>
-        <div className="settings-group soft-panel flex min-w-0 flex-col divide-y divide-border/70">
+        <div className="settings-group">
           {installRows.map((row) => (
             <GitInfoRow key={row.label} label={row.label} value={row.value} />
           ))}
@@ -1301,7 +1261,7 @@ function GitInfoPanel({
       </section>
       <section>
         <SettingsSectionLabel>{t("settingsGitIdentity")}</SettingsSectionLabel>
-        <div className="settings-group soft-panel flex min-w-0 flex-col divide-y divide-border/70">
+        <div className="settings-group">
           <GitIdentityRow
             label={t("gitInfoUserName")}
             value={info.userName}
@@ -1350,15 +1310,15 @@ function GitInfoPanel({
                 exit={reduceMotion ? undefined : collapse.exit}
                 transition={reduceMotion ? { duration: 0 } : collapse.transition}
               >
-                <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                  <p className="min-w-0 text-xs text-muted-foreground text-pretty">
+                <div className="settings-field-row">
+                  <p className="settings-field-row-desc text-pretty">
                     {t("settingsGithubIdentityHint")}
                   </p>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-8 shrink-0 gap-1.5 text-xs"
+                    className="h-8 shrink-0 gap-1.5 justify-self-start text-xs"
                     disabled={identitySyncing || editingField !== null}
                     onClick={onUseGithubIdentity}
                   >
@@ -1375,7 +1335,7 @@ function GitInfoPanel({
           </AnimatePresence>
         </div>
         {fieldError && (
-          <p className="mt-2 text-xs text-destructive text-pretty" title={fieldError}>
+          <p className="text-destructive text-pretty" title={fieldError}>
             {fieldError}
           </p>
         )}
@@ -1390,7 +1350,7 @@ function GitInfoPanel({
           </p>
         )}
       </section>
-    </div>
+    </>
   );
 }
 
@@ -1455,9 +1415,10 @@ function GitBehaviorPanel({ info, onSaved }: { info: GitInfo; onSaved: () => voi
   return (
     <section>
       <SettingsSectionLabel>{t("settingsGitBehavior")}</SettingsSectionLabel>
-      <div className="settings-group soft-panel flex min-w-0 flex-col divide-y divide-border/70">
+      <div className="settings-group">
         <GitIdentityRow
           label={t("gitConfigDefaultBranch")}
+          description={t("gitConfigDefaultBranchHint")}
           help={
             <GitConfigHelpButton
               title={t("gitConfigDefaultBranch")}
@@ -1485,15 +1446,12 @@ function GitBehaviorPanel({ info, onSaved }: { info: GitInfo; onSaved: () => voi
           inputType="text"
         />
       </div>
-      <p className="mt-2 text-xs text-muted-foreground text-pretty">
-        {t("gitConfigDefaultBranchHint")}
-      </p>
       {fieldError && (
-        <p className="mt-2 text-xs text-destructive text-pretty" title={fieldError}>
+        <p className="text-destructive text-pretty" title={fieldError}>
           {fieldError}
         </p>
       )}
-      <div className="settings-field-group soft-panel mt-3">
+      <div className="settings-group">
         <GitSegmentedField
           title={t("gitConfigAutocrlf")}
           description={t("gitConfigAutocrlfHint")}
@@ -1705,6 +1663,7 @@ function GitBehaviorPanel({ info, onSaved }: { info: GitInfo; onSaved: () => voi
 
 function GitIdentityRow({
   label,
+  description,
   help,
   value,
   emptyLabel,
@@ -1722,6 +1681,7 @@ function GitIdentityRow({
   inputType,
 }: {
   label: string;
+  description?: string;
   help?: ReactNode;
   value: string | null;
   emptyLabel: string;
@@ -1741,19 +1701,24 @@ function GitIdentityRow({
   const display = value?.trim() ? value : emptyLabel;
 
   return (
-    <div className="flex min-w-0 flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-      <div className="flex shrink-0 items-center gap-0.5 text-[11px] font-medium tracking-[0.02em] text-muted-foreground">
-        {label}
-        {help}
+    <div className="settings-field-row">
+      <div className="settings-field-row-label">
+        <span className="settings-field-row-title">
+          {label}
+          {help}
+        </span>
+        {description && (
+          <span className="settings-field-row-desc text-pretty">{description}</span>
+        )}
       </div>
       {editing ? (
-        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <div className="settings-field-row-control">
           <Input
             type={inputType}
             value={draft}
             autoFocus
             disabled={saving}
-            className="h-8 font-mono text-sm sm:max-w-xs sm:text-right"
+            className="h-8 max-w-xs font-mono text-sm"
             onChange={(event) => onDraftChange(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
@@ -1795,11 +1760,8 @@ function GitIdentityRow({
           </div>
         </div>
       ) : (
-        <div className="flex min-w-0 items-center justify-between gap-3 sm:justify-end">
-          <div
-            className="min-w-0 truncate font-mono text-sm select-text sm:text-right"
-            title={display}
-          >
+        <div className="settings-field-row-control">
+          <div className="settings-value" title={display}>
             {display}
           </div>
           <Button
@@ -1823,15 +1785,14 @@ function GitIdentityRow({
 
 function GitInfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 px-4 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-      <div className="shrink-0 text-[11px] font-medium tracking-[0.02em] text-muted-foreground">
-        {label}
+    <div className="settings-field-row">
+      <div className="settings-field-row-label">
+        <span className="settings-field-row-title">{label}</span>
       </div>
-      <div
-        className="min-w-0 truncate font-mono text-sm select-text sm:text-right"
-        title={value}
-      >
-        {value}
+      <div className="settings-field-row-control">
+        <div className="settings-value" title={value}>
+          {value}
+        </div>
       </div>
     </div>
   );

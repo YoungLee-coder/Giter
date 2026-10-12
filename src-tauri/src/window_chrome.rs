@@ -63,16 +63,16 @@ pub fn apply_window_chrome(window: &WebviewWindow, dark: bool) {
 
         // COLORREF = 0x00BBGGRR
         let caption: u32 = if dark {
-            // Match --background #121417
-            colorref(0x12, 0x14, 0x17)
+            // Match --background (dark) #0e0f11
+            colorref(0x0e, 0x0f, 0x11)
         } else {
             colorref(0xff, 0xff, 0xff)
         };
         let border = caption;
         let text: u32 = if dark {
-            colorref(0xff, 0xff, 0xff)
+            colorref(0xed, 0xee, 0xf0)
         } else {
-            colorref(0x1a, 0x1a, 0x1a)
+            colorref(0x14, 0x16, 0x19)
         };
         let immersive: i32 = if dark { 1 } else { 0 };
 

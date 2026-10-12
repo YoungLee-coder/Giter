@@ -98,7 +98,7 @@ export function CommitGraph({
   return (
     <ul
       ref={listRef}
-      className={cn("commit-graph soft-panel", className)}
+      className={cn("commit-graph", className)}
       aria-label={t("detailCommitGraph")}
     >
       {overlayH > 0 && (
@@ -205,7 +205,7 @@ function RefChip({ refInfo }: { refInfo: CommitRef }) {
       className={cn(
         "h-4 max-w-[7.5rem] min-w-0 px-1.5 text-[11px] font-medium tracking-tight",
         kind === "tag" &&
-          "border-transparent bg-[color-mix(in_srgb,var(--warn)_14%,transparent)] text-[var(--warn)]",
+          "border-transparent bg-[color-mix(in_srgb,var(--warn)_20%,transparent)] text-foreground",
         kind === "remote" && "border-transparent bg-transparent text-muted-foreground",
       )}
       title={refInfo.name}

@@ -1,4 +1,4 @@
 export { BatchBar } from "./BatchBar";
-export { RepoGrid } from "./RepoGrid";
-export { RepoCardBody } from "./RepoCard";
+export { RepoList } from "./RepoList";
+export { RepoRowBody } from "./RepoRow";
 export { RemoteProviderIcon } from "./RemoteProviderIcon";

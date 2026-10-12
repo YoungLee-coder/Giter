@@ -200,8 +200,9 @@ export function useRepoActions(options: {
     }
   };
 
-  const runBatch = async (mode: "fetch" | "update") => {
-    const paths = Array.from(selected);
+  /** Runs on `only` when given (section actions), otherwise on the selection. */
+  const runBatch = async (mode: "fetch" | "update", only?: string[]) => {
+    const paths = only ?? Array.from(selected);
     if (paths.length === 0) return;
     clearProgress();
     setBusy(true);

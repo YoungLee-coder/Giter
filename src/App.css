@@ -33,8 +33,10 @@
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-run: var(--run);
-  --radius-sm: calc(var(--radius) * 0.7);
-  --radius-md: calc(var(--radius) * 0.85);
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.35);
   --radius-2xl: calc(var(--radius) * 1.7);
@@ -44,79 +46,96 @@
 
 :root {
   color-scheme: light;
+  /* Dispatch board: white canvas, near-black neutral type. Primary is the ink
+     itself; amber (--signal) is reserved for "behind upstream" and the
+     fast-forward action that clears it. */
   --background: #ffffff;
-  --foreground: rgba(0, 0, 0, 0.86);
+  --foreground: oklch(0.2 0.006 260);
   --card: #ffffff;
-  --card-foreground: rgba(0, 0, 0, 0.86);
+  --card-foreground: oklch(0.2 0.006 260);
   --popover: #ffffff;
-  --popover-foreground: rgba(0, 0, 0, 0.86);
-  --primary: #007aff;
+  --popover-foreground: oklch(0.2 0.006 260);
+  --primary: oklch(0.22 0.006 260);
   --primary-foreground: #ffffff;
-  --secondary: rgba(0, 0, 0, 0.055);
-  --secondary-foreground: rgba(0, 0, 0, 0.86);
-  --muted: #f0f1f4;
-  --muted-foreground: rgba(0, 0, 0, 0.52);
-  --accent: color-mix(in srgb, var(--primary) 10%, transparent);
-  --accent-foreground: rgba(0, 0, 0, 0.86);
-  --destructive: #d70015;
-  --border: rgba(0, 0, 0, 0.08);
-  --input: rgba(0, 0, 0, 0.12);
-  --ring: rgba(10, 132, 255, 0.4);
-  --toolbar: #ffffff;
-  --ok: #248a3d;
-  --warn: #9a6700;
-  --run: #0071e3;
+  --secondary: oklch(0.2 0.006 260 / 0.06);
+  --secondary-foreground: oklch(0.2 0.006 260);
+  --muted: oklch(0.965 0.002 260);
+  --muted-foreground: oklch(0.5 0.008 260);
+  --accent: color-mix(in srgb, var(--primary) 8%, transparent);
+  --accent-foreground: oklch(0.2 0.006 260);
+  --destructive: oklch(0.53 0.2 28);
+  --border: oklch(0.2 0.006 260 / 0.1);
+  --input: oklch(0.2 0.006 260 / 0.18);
+  --ring: color-mix(in srgb, var(--primary) 40%, transparent);
+  --toolbar: var(--background);
+  --ok: oklch(0.5 0.12 160);
+  --warn: oklch(0.56 0.12 75);
+  --run: oklch(0.5 0.09 200);
+  --signal: oklch(0.8 0.155 78);
+  --signal-foreground: oklch(0.26 0.05 80);
+  --signal-text: oklch(0.5 0.12 65);
   --lane-violet: #7c3aed;
   --lane-teal: #0f766e;
   --lane-coral: #c2410c;
   --lane-slate: #475569;
+  --row-hover: oklch(0.2 0.006 260 / 0.04);
+  --row-selected: color-mix(in srgb, var(--primary) 8%, transparent);
   --repo-hover: color-mix(in srgb, var(--primary) 18%, var(--card));
-  --radius: 0.75rem;
-  --shadow-control: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.04);
+  /* Radius scale: 6 controls, 8 insets, 10 surfaces, pill for counts only. */
+  --radius: 0.625rem;
+  --shadow-control: 0 1px 1.5px oklch(0.2 0.006 260 / 0.08);
+  --shadow-card:
+    0 1px 2px oklch(0.2 0.006 260 / 0.06), 0 0 0 1px oklch(0.2 0.006 260 / 0.07);
   --shadow-segment: 0 0.5px 1px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-dialog: 0 8px 28px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow-dialog:
+    0 10px 32px oklch(0.2 0.006 260 / 0.16), 0 2px 8px oklch(0.2 0.006 260 / 0.08);
 
-  /* Motion tokens — cc-switch style (ease-out / duration-200|300) */
+  /* Motion tokens */
   --motion-ease: ease;
-  --motion-ease-out: ease-out;
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --motion-ease-in-out: ease-in-out;
-  --motion-duration-fast: 150ms;
-  --motion-duration-color: 200ms;
-  --motion-duration-panel: 300ms;
+  --motion-duration-fast: 120ms;
+  --motion-duration-color: 160ms;
+  --motion-duration-panel: 220ms;
 }
 
 .dark {
   color-scheme: dark;
-  --background: #121417;
-  --foreground: rgba(255, 255, 255, 0.9);
-  --card: #1c1f26;
-  --card-foreground: rgba(255, 255, 255, 0.9);
-  --popover: #232833;
-  --popover-foreground: rgba(255, 255, 255, 0.9);
-  --primary: #0a84ff;
-  --primary-foreground: #ffffff;
-  --secondary: rgba(255, 255, 255, 0.08);
-  --secondary-foreground: rgba(255, 255, 255, 0.9);
-  --muted: #252a33;
-  --muted-foreground: rgba(255, 255, 255, 0.55);
-  --accent: color-mix(in srgb, var(--primary) 16%, transparent);
-  --accent-foreground: rgba(255, 255, 255, 0.9);
-  --destructive: #ff453a;
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.14);
-  --ring: rgba(10, 132, 255, 0.5);
-  --toolbar: #16191f;
-  --ok: #30d158;
-  --warn: #ffd60a;
-  --run: #64d2ff;
+  /* Dark elevation is luminance stepping, not shadow. */
+  --background: oklch(0.17 0.004 260);
+  --foreground: oklch(0.95 0.003 260);
+  --card: oklch(0.205 0.005 260);
+  --card-foreground: oklch(0.95 0.003 260);
+  --popover: oklch(0.24 0.006 260);
+  --popover-foreground: oklch(0.95 0.003 260);
+  --primary: oklch(0.95 0.003 260);
+  --primary-foreground: oklch(0.19 0.005 260);
+  --secondary: oklch(0.95 0.003 260 / 0.08);
+  --secondary-foreground: oklch(0.95 0.003 260);
+  --muted: oklch(0.24 0.005 260);
+  --muted-foreground: oklch(0.7 0.008 260);
+  --accent: color-mix(in srgb, var(--primary) 12%, transparent);
+  --accent-foreground: oklch(0.95 0.003 260);
+  --destructive: oklch(0.7 0.19 25);
+  --border: oklch(0.95 0.003 260 / 0.1);
+  --input: oklch(0.95 0.003 260 / 0.17);
+  --ring: color-mix(in srgb, var(--primary) 45%, transparent);
+  --toolbar: var(--background);
+  --ok: oklch(0.78 0.14 160);
+  --warn: oklch(0.82 0.14 85);
+  --run: oklch(0.78 0.09 200);
+  --signal: oklch(0.82 0.15 80);
+  --signal-foreground: oklch(0.22 0.04 80);
+  --signal-text: oklch(0.82 0.15 80);
   --lane-violet: #bf5af2;
   --lane-teal: #64d2c0;
   --lane-coral: #ff7a59;
   --lane-slate: #8e9bb5;
+  --row-hover: oklch(0.95 0.003 260 / 0.05);
+  --row-selected: color-mix(in srgb, var(--primary) 10%, transparent);
   --repo-hover: color-mix(in srgb, var(--primary) 22%, var(--card));
   --shadow-control: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28), 0 6px 16px rgba(0, 0, 0, 0.28);
+  --shadow-card: 0 0 0 1px oklch(0.95 0.003 260 / 0.08);
   --shadow-segment: 0 0.5px 1px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.06);
   --shadow-dialog: 0 12px 36px rgba(0, 0, 0, 0.48), 0 2px 10px rgba(0, 0, 0, 0.32);
 }
@@ -253,172 +272,239 @@
 .app-header [data-slot="checkbox"],
 .app-header [data-slot="dropdown-menu-trigger"],
 .app-header [data-slot="popover-trigger"],
-/* Settings page — System Settings–style sidebar + preference panes */
-.settings-page-header {
-  user-select: none;
-}
+/* Settings page */
 
-.settings-back {
-  display: flex;
-  width: 2.25rem;
-  height: 2.25rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: calc(var(--radius-lg) * 0.75);
-  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
-  background: var(--card);
-  box-shadow: var(--shadow-control);
-}
-
+/* One ledger for every pane: a tinted band names the section, ruled rows hold
+   label | value in two columns, same grammar as the fleet board. */
 .settings-shell {
   min-height: 0;
   background: var(--background);
 }
 
 .settings-sidebar {
-  display: none;
-  width: 13.5rem;
+  width: 12rem;
   flex-shrink: 0;
-  border-right: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: var(--background);
-  padding: 1rem 0.75rem;
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 0.5rem;
 }
 
 .settings-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.125rem;
 }
 
 .settings-nav-item {
+  position: relative;
   display: flex;
+  height: 2rem;
   width: 100%;
   align-items: center;
-  gap: 0.65rem;
-  border: 0;
-  border-radius: calc(var(--radius-lg) * 0.75);
-  background: transparent;
-  padding: 0.5rem 0.6rem;
+  gap: 0.5rem;
+  border-radius: var(--radius-sm);
+  padding-inline: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--muted-foreground);
   text-align: left;
-  transition:
-    background-color var(--motion-duration-color) var(--motion-ease-out),
-    color var(--motion-duration-color) var(--motion-ease-out);
+  outline: none;
+  transition: color var(--motion-duration-color) var(--motion-ease-out);
 }
 
-.settings-nav-item:hover:not([data-active="true"]) {
-  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+.settings-nav-item:hover,
+.settings-nav-item[aria-current="page"] {
   color: var(--foreground);
 }
 
-.settings-nav-item[data-active="true"] {
-  background: color-mix(in srgb, var(--primary) 9%, transparent);
-  color: var(--primary);
+.settings-nav-item:focus-visible {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+/* One plate slides between entries, same as the board's filter tabs. */
+.settings-nav-plate {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--secondary);
+}
+
+.settings-nav-icon,
+.settings-nav-label {
+  position: relative;
 }
 
 .settings-nav-icon {
-  display: inline-flex;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1rem;
+  height: 1rem;
   flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  color: inherit;
-}
-
-.settings-nav-label {
-  min-width: 0;
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.25;
 }
 
 .settings-body {
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 1.25rem 1.25rem 2rem;
-  background: var(--background);
+  border-top: 1px solid var(--border);
+  padding-bottom: 3rem;
 }
 
 .settings-content {
   width: 100%;
-  max-width: 40rem;
-  margin-inline: auto;
-}
-
-.settings-pane-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.85rem;
-  margin-bottom: 1.5rem;
-}
-
-.settings-pane-icon {
-  display: inline-flex;
-  width: 2.5rem;
-  height: 2.5rem;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
-  background: color-mix(in srgb, var(--muted) 55%, var(--card));
-  color: var(--foreground);
-  box-shadow: var(--shadow-control);
-}
-
-.settings-pane-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.settings-pane-desc {
-  margin-top: 0.25rem;
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  color: var(--muted-foreground);
 }
 
 .settings-section-label {
-  margin: 0 0 0.5rem 0.15rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--muted-foreground);
-  text-transform: none;
-}
-
-.settings-field-row {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.9rem 1rem;
+  height: 2.25rem;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--foreground) 3.5%, var(--background));
+  padding-inline: 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 
-.settings-field-row + .settings-field-row {
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-}
-
-.settings-field-row--stack {
-  gap: 0.85rem;
+.settings-field-row,
+.settings-status-card {
+  display: grid;
+  min-height: 3rem;
+  grid-template-columns: minmax(11rem, 20rem) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 1.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  padding: 0.625rem 1rem;
 }
 
 .settings-field-row-label {
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
   min-width: 0;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
-.settings-field-row-title {
+.settings-field-row-title,
+.settings-status-card-title {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   line-height: 1.35;
+}
+
+.settings-field-row-desc,
+.settings-status-card-desc {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+.settings-field-row-control,
+.settings-status-card > :last-child {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+/* Inline edit / action buttons share one height so every row keeps the same rhythm. */
+.settings-field-row-control > [data-slot="button"],
+.settings-status-card [data-slot="button"] {
+  height: 1.75rem;
+}
+
+/* Rows whose control is a lone action: the button sits at the row's end, in
+   line with the link rows' glyphs below. */
+.settings-field-row--end .settings-field-row-control {
+  justify-content: flex-end;
+}
+
+.settings-value {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.settings-note,
+.settings-body section > p {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  margin: 0;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.settings-body section > .settings-note {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.settings-about-hero {
+  border-bottom: 1px solid var(--border);
+  padding: 1rem;
+}
+
+.settings-about-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.settings-about-logo {
+  width: 3rem;
+  height: 3rem;
+  flex-shrink: 0;
+  border-radius: 0.7rem;
+}
+
+.settings-link-row {
+  display: flex;
+  width: 100%;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  padding: 0.625rem 1rem;
+  text-align: left;
+  outline: none;
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.settings-link-row:hover {
+  background: color-mix(in srgb, var(--foreground) 4%, var(--background));
+}
+
+.settings-link-row:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+
+.settings-link-row-meta {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--muted-foreground);
+}
+
+.settings-page-header {
+  user-select: none;
+}
+
+.settings-back {
+  display: flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
 }
 
 .settings-help-btn {
@@ -745,22 +831,10 @@
   opacity: 0.8;
 }
 
-.settings-field-row-desc {
-  font-size: 0.75rem;
-  line-height: 1.4;
-  color: var(--muted-foreground);
-}
-
-.settings-field-row-control {
-  width: 100%;
-  min-width: 0;
-}
-
 .settings-stepper {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  margin-left: auto;
 }
 
 .settings-stepper-btn {
@@ -804,41 +878,6 @@
   -webkit-appearance: none;
 }
 
-.settings-status-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-radius: calc(var(--radius-lg) * 0.95);
-  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
-  background: var(--card);
-  box-shadow: var(--shadow-card);
-  padding: 1rem 1.1rem;
-}
-
-.settings-status-card--ok {
-  border-color: color-mix(in srgb, var(--ok) 28%, var(--border));
-  background: color-mix(in srgb, var(--ok) 8%, var(--card));
-}
-
-.settings-status-card--warn {
-  border-color: color-mix(in srgb, var(--destructive) 28%, var(--border));
-  background: color-mix(in srgb, var(--destructive) 8%, var(--card));
-}
-
-.settings-status-card-title {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.settings-status-card-desc {
-  margin-top: 0.15rem;
-  font-size: 0.75rem;
-  line-height: 1.4;
-  color: var(--muted-foreground);
-}
-
 .settings-status-dot {
   width: 0.65rem;
   height: 0.65rem;
@@ -854,80 +893,6 @@
 .settings-status-dot--warn {
   background: var(--destructive);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--destructive) 22%, transparent);
-}
-
-.settings-about-hero {
-  overflow: hidden;
-  border-radius: calc(var(--radius-lg) * 0.95);
-  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
-  background:
-    radial-gradient(
-      120% 80% at 0% 0%,
-      color-mix(in srgb, var(--primary) 14%, transparent),
-      transparent 55%
-    ),
-    var(--card);
-  box-shadow: var(--shadow-card);
-  padding: 1.35rem 1.4rem;
-}
-
-.dark .settings-about-hero {
-  background:
-    radial-gradient(
-      120% 80% at 0% 0%,
-      color-mix(in srgb, var(--primary) 20%, transparent),
-      transparent 55%
-    ),
-    var(--card);
-}
-
-.settings-about-brand {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.settings-about-logo {
-  width: 4.5rem;
-  height: 4.5rem;
-  flex-shrink: 0;
-  border-radius: 1.15rem;
-  box-shadow: var(--shadow-card);
-}
-
-.settings-link-row {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border: 0;
-  background: transparent;
-  padding: 0.9rem 1rem;
-  text-align: left;
-  color: inherit;
-  transition: background-color var(--motion-duration-color) var(--motion-ease-out);
-}
-
-.settings-link-row + .settings-link-row {
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-}
-
-.settings-link-row:hover {
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
-}
-
-.settings-link-row:focus-visible {
-  outline: none;
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
-}
-
-.settings-link-row-meta {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 0.35rem;
-  color: var(--muted-foreground);
 }
 
 .settings-update-progress {
@@ -957,90 +922,6 @@
 }
 
 /* Mobile / narrow: horizontal pill nav instead of sidebar */
-.settings-mobile-nav {
-  display: flex;
-  gap: 0.25rem;
-  overflow-x: auto;
-  margin-bottom: 1.25rem;
-  border-radius: 0.625rem;
-  background: color-mix(in srgb, var(--muted) 55%, var(--card));
-  padding: 0.25rem;
-}
-
-.settings-mobile-tab {
-  flex: 1 1 0;
-  min-width: 4.25rem;
-  border: 0;
-  border-radius: 0.5rem;
-  padding: 0.45rem 0.65rem;
-  background: transparent;
-  color: var(--muted-foreground);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  line-height: 1.25;
-  white-space: nowrap;
-  transition:
-    color var(--motion-duration-color) var(--motion-ease-out),
-    background-color var(--motion-duration-color) var(--motion-ease-out),
-    box-shadow var(--motion-duration-color) var(--motion-ease-out);
-}
-
-.settings-mobile-tab:hover:not([data-active="true"]) {
-  color: var(--foreground);
-}
-
-.settings-mobile-tab[data-active="true"] {
-  background: var(--card);
-  color: var(--foreground);
-  box-shadow: var(--shadow-segment);
-}
-
-@media (min-width: 720px) {
-  .settings-sidebar {
-    display: block;
-  }
-
-  .settings-body {
-    padding: 1.5rem 1.75rem 2.25rem;
-  }
-
-  .settings-mobile-nav {
-    display: none;
-  }
-
-  .settings-field-row {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1.25rem;
-  }
-
-  .settings-field-row-label {
-    flex: 1 1 auto;
-  }
-
-  .settings-field-row-control {
-    flex: 0 0 auto;
-    width: min(100%, 18rem);
-    display: flex;
-    justify-content: flex-end;
-  }
-
-  .settings-field-row--stack {
-    align-items: flex-start;
-  }
-
-  .settings-field-row--choices {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.7rem;
-  }
-
-  .settings-field-row--choices .settings-field-row-control {
-    width: 100%;
-    justify-content: stretch;
-  }
-}
 
 .settings-page-title {
   font-size: 1.75rem;
@@ -1080,6 +961,9 @@
   [data-slot="card"],
   [data-slot="alert"],
   [data-slot="button"],
+  /* asChild triggers overwrite data-slot, so name them or they stay round. */
+  [data-slot="dropdown-menu-trigger"],
+  [data-slot="popover-trigger"],
   [data-slot="input"],
   [data-slot="toggle"],
   [data-slot="popover-content"],
@@ -1091,89 +975,633 @@
   .settings-about-logo,
   .settings-mobile-nav,
   .settings-row,
-  .soft-panel {
+  .soft-panel,
+  .batch-bar {
     corner-shape: squircle;
   }
 }
 
-/* Repo cards — hover/selected: primary border + light shadow (cc-switch hover). */
-.repo-card {
-  --card-spacing: 0.875rem;
+/* ---------------------------------------------------------------------------
+   Fleet home: state tally (doubles as filter) -> repo ledger -> batch bar.
+   --------------------------------------------------------------------------- */
+.app-wordmark {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.fleet-bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  padding: 0.25rem 1rem 0.625rem;
+}
+
+.fleet-filters {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.fleet-filter {
   position: relative;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
+  display: inline-flex;
+  height: 1.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-sm);
+  padding-inline: 0.6rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  outline: none;
+  transition: color var(--motion-duration-color) var(--motion-ease-out);
+}
+
+.fleet-filter:hover:not(:disabled, [aria-selected="true"]) {
+  color: var(--foreground);
+}
+
+.fleet-filter:focus-visible {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.fleet-filter[aria-selected="true"] {
+  color: var(--foreground);
+}
+
+.fleet-filter:disabled {
+  opacity: 0.45;
+}
+
+/* One plate slides between filters instead of each lighting up on its own. */
+.fleet-filter__pill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--card);
   box-shadow: var(--shadow-card);
-  --squircle-border: color-mix(in srgb, var(--border) 80%, transparent);
-  transition:
-    box-shadow var(--motion-duration-panel) var(--motion-ease-out),
-    opacity var(--motion-duration-color) var(--motion-ease-out),
-    border-color var(--motion-duration-panel) var(--motion-ease-out);
 }
 
-.repo-card:not(.is-dragging):hover,
-.repo-card.is-selected {
-  --squircle-border: var(--primary);
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+.fleet-filter__label,
+.fleet-filter__count {
+  position: relative;
 }
 
-/* In-place drag affordance (cc-switch style) — never opacity:0; that fades
-   back in on drop and reads as a flash. */
-.repo-card.is-dragging {
+.fleet-filter__count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+
+/* A non-zero problem bucket carries its state colour so it reads before a click. */
+.fleet-filter[data-tone="behind"]:not(:disabled) .fleet-filter__count {
+  font-weight: 600;
+  color: var(--signal-text);
+}
+
+.fleet-filter[data-tone="error"]:not(:disabled) .fleet-filter__count {
+  font-weight: 600;
+  color: var(--destructive);
+}
+
+.fleet-search {
+  display: flex;
+  height: 1.75rem;
+  flex: 1 1 9rem;
+  max-width: 13rem;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--secondary);
+  padding-inline: 0.5rem;
+  color: var(--muted-foreground);
+  transition: background-color var(--motion-duration-color) var(--motion-ease-out);
+}
+
+.fleet-search:focus-within {
+  background: var(--card);
+  box-shadow:
+    0 0 0 1px var(--primary),
+    0 0 0 3px var(--ring);
+}
+
+.fleet-search > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+}
+
+.fleet-search > input {
+  min-width: 0;
+  flex: 1;
+  background: transparent;
+  font-size: 0.8125rem;
+  color: var(--foreground);
+  outline: none;
+}
+
+.fleet-search > input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.fleet-search > input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* The board's top rule; a segment sweeps across it while the fleet is working. */
+.fleet-activity {
+  position: relative;
+  height: 1px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.fleet-activity::after {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 28%;
+  background: var(--foreground);
+  content: "";
+  opacity: 0;
+  translate: -100% 0;
+}
+
+.fleet-activity[data-active]::after {
+  opacity: 1;
+  animation: fleet-sweep 900ms var(--motion-ease-in-out) infinite;
+}
+
+@keyframes fleet-sweep {
+  to {
+    translate: 460% 0;
+  }
+}
+
+/* Controls lock while the fleet works; hold the dimming back briefly so a
+   fast refresh doesn't strobe every button on the board. */
+.app-header [data-slot="button"],
+.ledger-section [data-slot="button"] {
+  transition-property: color, background-color, border-color, scale, opacity;
+}
+
+.app-header [data-slot="button"]:disabled,
+.ledger-section [data-slot="button"]:disabled {
+  transition-delay: 0s, 0s, 0s, 0s, 240ms;
+}
+
+.fleet-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  /* Clear the floating batch bar on the last rows. */
+  padding-bottom: 5rem;
+}
+
+/* The board runs edge to edge on the canvas: rules, not a card. */
+.repo-ledger {
+  --ledger-cols: 1.75rem minmax(0, 2.4fr) minmax(0, 1.2fr) 10rem minmax(0, 11rem) 1.5rem;
+}
+
+.repo-ledger__head,
+.repo-row {
+  display: grid;
+  grid-template-columns: var(--ledger-cols);
+  align-items: center;
+  column-gap: 0.75rem;
+  padding-inline: 1rem 0.5rem;
+}
+
+.repo-ledger__head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 1.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.repo-ledger__sync-head,
+.sync {
+  display: grid;
+  grid-template-columns: 1fr 2px 1fr;
+  align-items: center;
+  column-gap: 0.375rem;
+}
+
+.repo-ledger__sync-head > :first-child {
+  text-align: right;
+}
+
+.repo-ledger__sync-head > i,
+.sync__axis {
+  width: 2px;
+  height: 0.75rem;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--foreground) 28%, transparent);
+}
+
+.ledger-section {
+  /* Pins under the column head so the section's action stays reachable. */
+  position: sticky;
+  top: 1.75rem;
+  z-index: 1;
+  display: flex;
+  height: 2.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--foreground) 3.5%, var(--background));
+  padding-inline: 1rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.ledger-section__title {
+  font-weight: 600;
+}
+
+.ledger-section__count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+
+.ledger-section[data-section="behind"] .ledger-section__count {
+  font-weight: 600;
+  color: var(--signal-text);
+}
+
+.ledger-section[data-section="error"] .ledger-section__title,
+.ledger-section[data-section="error"] .ledger-section__count {
+  color: var(--destructive);
+}
+
+.ledger-section__note {
+  margin-left: 0.5rem;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-row {
+  position: relative;
+  height: 2.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  background: var(--background);
+  font-size: 0.8125rem;
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.repo-row:hover {
+  background: color-mix(in srgb, var(--foreground) 4%, var(--background));
+}
+
+.repo-row[data-selected="true"] {
+  background: color-mix(in srgb, var(--foreground) 8%, var(--background));
+}
+
+.repo-row.is-dragging {
+  z-index: 3;
   cursor: grabbing;
-  --squircle-border: var(--primary);
-  /* Disable opacity/border transitions while dragging so drop does not fade. */
-  transition: none;
+  border-bottom-color: transparent;
+  border-radius: var(--radius-md);
+  background: var(--popover);
+  box-shadow: var(--shadow-dialog);
 }
 
-.repo-grid > .repo-card {
+/* A row that just changed section glows amber once, so a batch result is seen
+   where it landed. */
+.repo-row[data-arrived] {
+  animation: repo-row-arrive 1.3s var(--motion-ease-out);
+}
+
+@keyframes repo-row-arrive {
+  from {
+    background: color-mix(in srgb, var(--signal) 30%, var(--background));
+  }
+}
+
+/* First paint only: sections and rows settle in reading order. */
+.repo-ledger.is-entering .ledger-section,
+.repo-ledger.is-entering .repo-row {
+  animation: ledger-enter 300ms var(--motion-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 24ms);
+}
+
+@keyframes ledger-enter {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .repo-row[data-arrived],
+  .repo-ledger.is-entering .ledger-section,
+  .repo-ledger.is-entering .repo-row {
+    animation: none;
+  }
+
+  .fleet-activity[data-active]::after {
+    animation: none;
+    width: 100%;
+    translate: 0 0;
+    opacity: 0.5;
+  }
+
+  .sync__side > i {
+    transition: none;
+  }
+}
+
+.repo-row__check {
+  display: flex;
+  align-items: center;
+}
+
+.repo-row__identity {
+  display: flex;
   min-width: 0;
-  /* content-visibility + layout transforms = intermittent blank frames */
-  content-visibility: visible;
-  contain-intrinsic-size: auto 128px;
+  align-items: center;
+  gap: 0.55rem;
 }
 
-.repo-card-slot {
+.repo-row__icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+
+.repo-row__name {
   min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  outline: none;
 }
 
-.repo-grid.is-reordering .repo-card-slot {
+.repo-row__name:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.repo-row__name:focus-visible {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.repo-row__path {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-row__branch {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.repo-row__branch > svg {
+  width: 0.8125rem;
+  height: 0.8125rem;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+
+/* Sync: bars grow away from the upstream axis, each count sits at its tip. */
+.sync {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync--none {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+.sync__side {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--muted-foreground);
+}
+
+.sync__side--behind {
+  justify-content: flex-end;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.sync__side > i {
+  height: 0.375rem;
+  flex-shrink: 0;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--foreground) 45%, transparent);
+  transition: width 420ms var(--motion-ease-out);
+}
+
+.sync__side--behind > i {
+  background: var(--signal);
+}
+
+.repo-row__state {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted-foreground);
+}
+
+.repo-row__state > i {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.repo-row__state[data-tone="quiet"] > i {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, currentColor 55%, transparent);
+}
+
+.repo-row__state[data-tone="dirty"] {
+  color: var(--foreground);
+}
+
+/* Half-filled: work in progress, told apart from the red dot by shape too. */
+.repo-row__state[data-tone="dirty"] > i {
+  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+.repo-row__state[data-tone="error"] {
+  color: var(--destructive);
+}
+
+.repo-row__state[data-tone="ok"] {
+  color: var(--ok);
+}
+
+.repo-row__state[data-tone="run"] {
+  color: var(--run);
+}
+
+.repo-row__grip {
+  display: flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  cursor: grab;
+  opacity: 0;
+  outline: none;
+}
+
+.repo-row__grip > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.repo-row:hover .repo-row__grip,
+.repo-row.is-dragging .repo-row__grip,
+.repo-row__grip:focus-visible {
+  opacity: 1;
+}
+
+.repo-row__grip:focus-visible {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.repo-ledger.is-reordering .repo-row {
   will-change: transform;
 }
 
-.repo-grid.is-reordering .repo-card {
-  /* Avoid CSS opacity/color transitions fighting sibling FLIP frames. */
-  transition: none;
+@media (max-width: 760px) {
+  .repo-ledger {
+    --ledger-cols: 1.75rem minmax(0, 1.6fr) minmax(0, 1fr) 10rem minmax(0, 7rem) 1.5rem;
+  }
+
+  .repo-row__path,
+  .ledger-section__note {
+    display: none;
+  }
 }
 
-.repo-card.is-dragging > svg[style*="pointer-events"],
-.repo-grid.is-reordering .repo-card > svg[style*="pointer-events"] {
-  transition: none;
-}
-
-.repo-card-icon {
+.fleet-empty {
   display: flex;
-  width: 2rem;
-  height: 2rem;
+  flex: 1;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: calc(var(--radius-lg) * 0.6);
-  border: 1px solid var(--border);
-  background: var(--muted);
-  color: var(--primary);
-  flex-shrink: 0;
-  transition: transform var(--motion-duration-panel) var(--motion-ease-out);
+  gap: 0.25rem;
+  padding: 3rem 1.5rem 5rem;
+  text-align: center;
 }
 
-.repo-card-icon--github {
-  width: 2.5rem;
-  height: 2.5rem;
-  border: none;
-  background: transparent;
-  color: inherit;
+.fleet-empty--inline {
+  padding-block: 2.5rem;
 }
 
-.repo-card:not(.is-dragging):hover .repo-card-icon {
-  transform: scale(1.05);
+.fleet-empty__icon {
+  display: flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  border-radius: var(--radius-md);
+  background: var(--secondary);
+  color: var(--muted-foreground);
+}
+
+.fleet-empty__icon > svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.fleet-empty__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.fleet-empty__hint {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.batch-bar {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  /* Centre without touching transform, which framer-motion animates. */
+  translate: -50% 0;
+  /* Concentric corners: bar radius = button radius + padding. */
+  --batch-pad: 0.375rem;
+  --batch-inner-radius: 0.625rem;
+  border-radius: calc(var(--batch-inner-radius) + var(--batch-pad));
+  background: var(--popover);
+  padding: var(--batch-pad) var(--batch-pad) var(--batch-pad) 0.875rem;
+  box-shadow:
+    var(--shadow-dialog),
+    0 0 0 1px var(--border);
+}
+
+.batch-bar [data-slot="button"] {
+  border-radius: var(--batch-inner-radius);
+}
+
+.batch-bar__count {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.batch-bar__rule {
+  width: 1px;
+  height: 1rem;
+  margin-inline: 0.25rem;
+  background: var(--border);
 }
 
 .app-banners {
@@ -1199,10 +1627,9 @@
 /* Soft nested panels — settings rows, detail lists, dialog insets */
 .soft-panel {
   overflow: hidden;
-  border-radius: calc(var(--radius-lg) * 0.85);
-  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
-  background: color-mix(in srgb, var(--muted) 45%, var(--card));
-  box-shadow: var(--shadow-control);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
 }
 
 .soft-panel.soft-panel--flat {
@@ -1212,7 +1639,7 @@
 /* Commit graph inside repo detail — one overlay SVG so lanes stay continuous */
 .commit-graph {
   --graph-node-y: 30%;
-  --graph-inset-start: 0.7rem;
+  --graph-inset-start: 1rem;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1234,7 +1661,8 @@
   min-width: 0;
   align-items: stretch;
   gap: 0.55rem;
-  padding-inline: var(--graph-inset-start) 0.85rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  padding-inline: var(--graph-inset-start) 1rem;
 }
 
 .commit-graph__lanes {
@@ -1332,7 +1760,7 @@
 
 /* Grouped preference lists — macOS Settings–style inset rows */
 .settings-group {
-  background: color-mix(in srgb, var(--muted) 28%, var(--card));
+  background: transparent;
 }
 
 .settings-group-row {
@@ -1373,16 +1801,9 @@
     transition: none !important;
   }
 
-  .repo-card,
-  .repo-card.is-dragging,
-  .repo-grid.is-reordering .repo-card,
   .squircle-host > svg[style*="pointer-events"],
-  .repo-card-icon {
+  .fleet-search {
     transition: none !important;
-  }
-
-  .repo-card:not(.is-dragging):hover .repo-card-icon {
-    transform: none !important;
   }
 
   /* tw-animate enter/exit + indefinite spinners */
@@ -1409,10 +1830,11 @@
   .settings-group-row--action {
     transition: none !important;
     transform: none !important;
+    scale: none !important;
   }
 }
 
-/* Scroll container marker (used by RepoGrid); scrollbar is globally hidden */
+/* Scroll container marker; scrollbar is globally hidden */
 .giter-scroll {
   overflow-x: hidden;
 }
@@ -1436,28 +1858,30 @@
   flex-shrink: 0;
   align-items: center;
   gap: 0.85rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--toolbar) 94%, var(--card));
-  padding: 0.7rem 1.25rem;
+  background: var(--background);
+  padding: 0.55rem 1rem 0.35rem;
 }
 
 .workspace-back {
   display: inline-flex;
-  width: 2.05rem;
-  height: 2.05rem;
+  width: 2rem;
+  height: 2rem;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: calc(var(--radius-lg) * 0.6);
-  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
-  background: var(--card);
+  border-radius: var(--radius-md);
   color: var(--foreground);
-  box-shadow: var(--shadow-control);
-  transition: background-color var(--motion-duration-color) var(--motion-ease-out);
+  transition:
+    background-color var(--motion-duration-color) var(--motion-ease-out),
+    scale var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .workspace-back:hover {
   background: var(--secondary);
+}
+
+.workspace-back:active {
+  scale: 0.96;
 }
 
 .workspace-back:focus-visible {
@@ -1469,7 +1893,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.1rem;
 }
 
 .workspace-identity__name {
@@ -1477,10 +1901,11 @@
   min-width: 0;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.9375rem;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
 }
 
 .workspace-identity__meta {
@@ -1488,7 +1913,7 @@
   min-width: 0;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.15rem 0.75rem;
 }
 
 .workspace-dirty-dot {
@@ -1504,49 +1929,38 @@
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 0.3rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
-  background: color-mix(in srgb, var(--muted) 70%, var(--card));
-  padding: 0.1rem 0.5rem;
-  font-size: 11.5px;
-  font-weight: 500;
+  gap: 0.25rem;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--muted-foreground);
   white-space: nowrap;
 }
 
 .workspace-chip > svg {
-  width: 0.7rem;
-  height: 0.7rem;
+  width: 0.75rem;
+  height: 0.75rem;
   flex-shrink: 0;
 }
 
 .workspace-chip--branch {
-  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
-  background: color-mix(in srgb, var(--primary) 10%, transparent);
-  color: var(--primary);
+  color: var(--foreground);
   font-family: var(--font-mono);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .workspace-chip--ahead {
-  border-color: color-mix(in srgb, var(--ok) 30%, var(--border));
-  background: color-mix(in srgb, var(--ok) 10%, transparent);
-  color: var(--ok);
+  color: var(--foreground);
   font-variant-numeric: tabular-nums;
 }
 
 .workspace-chip--behind {
-  border-color: color-mix(in srgb, var(--warn) 32%, var(--border));
-  background: color-mix(in srgb, var(--warn) 12%, transparent);
-  color: var(--warn);
+  color: var(--foreground);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .workspace-chip--ok {
-  border-color: color-mix(in srgb, var(--ok) 26%, var(--border));
-  color: color-mix(in srgb, var(--ok) 88%, var(--foreground));
+  color: var(--muted-foreground);
 }
 
 .workspace-toolbar {
@@ -1561,14 +1975,7 @@
 .workspace-seg {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--secondary) 88%, var(--foreground) 4%);
-  padding: 3px;
-}
-
-.dark .workspace-seg {
-  background: var(--secondary);
+  gap: 0.25rem;
 }
 
 .workspace-seg [data-slot="button"] {
@@ -1579,7 +1986,7 @@
   background: transparent;
   box-shadow: none !important;
   padding-inline: 0.6rem;
-  color: var(--muted-foreground);
+  color: var(--foreground);
   font-size: 12.5px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -1617,22 +2024,18 @@
 }
 
 /* Tab strip */
+
 .workspace-tabs {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   gap: 0.75rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--toolbar) 94%, var(--card));
-  padding: 0.55rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+  padding: 0.25rem 1rem 0.625rem;
 }
 
 /* Roomier section tabs than the settings segmented control (shared .mac-segment). */
-.workspace-tabs .mac-segment [data-slot="toggle-group-item"] {
-  height: 28px;
-  padding-inline: 0.8rem;
-  font-size: 12.5px;
-}
 
 .workspace-tabs__meta {
   display: inline-flex;
@@ -1644,26 +2047,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.workspace-tab-count {
-  display: inline-flex;
-  min-width: 1.05rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--foreground) 9%, transparent);
-  padding: 0 0.28rem;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.4;
-  font-variant-numeric: tabular-nums;
-}
-
-.mac-segment [data-slot="toggle-group-item"][data-state="on"] .workspace-tab-count {
-  background: color-mix(in srgb, var(--primary) 16%, transparent);
-  color: var(--primary);
-}
-
 /* In-flow banners (operation in progress / error) */
+
 .workspace-banner {
   display: flex;
   flex-shrink: 0;
@@ -1671,7 +2056,7 @@
   gap: 0.5rem;
   border-bottom: 1px solid color-mix(in srgb, var(--warn) 30%, var(--border));
   background: color-mix(in srgb, var(--warn) 12%, var(--card));
-  padding: 0.45rem 1.25rem;
+  padding: 0.45rem 1rem;
   font-size: 0.8125rem;
 }
 
@@ -1679,6 +2064,16 @@
   border-bottom-color: color-mix(in srgb, var(--destructive) 32%, var(--border));
   background: color-mix(in srgb, var(--destructive) 10%, var(--card));
   color: var(--destructive);
+}
+
+/* Behind upstream: same amber as the board, with the action that clears it. */
+.workspace-banner--behind {
+  border-bottom-color: color-mix(in srgb, var(--signal) 40%, var(--border));
+  background: color-mix(in srgb, var(--signal) 14%, var(--background));
+}
+
+.workspace-banner--behind .workspace-banner__icon {
+  color: var(--signal-text);
 }
 
 .workspace-banner__icon {
@@ -1709,13 +2104,13 @@
   min-height: 0;
   flex-direction: column;
   border-right: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--muted) 30%, var(--card));
+  background: var(--background);
 }
 
 .workspace-split--aside-end .workspace-split__aside {
   border-right: 0;
   border-left: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--muted) 22%, var(--card));
+  background: var(--background);
 }
 
 .workspace-split__main {
@@ -1723,6 +2118,7 @@
   min-height: 0;
   min-width: 0;
   flex-direction: column;
+  background: var(--card);
 }
 
 .workspace-pane-head {
@@ -1731,9 +2127,9 @@
   flex-shrink: 0;
   align-items: center;
   gap: 0.4rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: var(--card);
-  padding: 0.35rem 0.5rem 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+  padding: 0.3rem 0.5rem 0.3rem 1rem;
 }
 
 .workspace-pane-head__path {
@@ -1759,60 +2155,59 @@
   color: var(--foreground);
 }
 
+/* History search sits in the pane head like the board's filter field: a quiet
+   fill, no frame until it has focus. */
+.workspace-search[data-slot="input"] {
+  border-color: transparent;
+  background: var(--secondary);
+  box-shadow: none;
+  font-size: 0.8125rem;
+}
+
+.workspace-search[data-slot="input"]:focus-visible {
+  border-color: var(--primary);
+  background: var(--card);
+}
+
 /* File list */
+
 .workspace-file-groups {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 0.9rem;
-  padding: 0.6rem 0.45rem 0.9rem;
+  padding-bottom: 0.75rem;
 }
 
 .workspace-file-group {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
 }
 
 .workspace-file-group__head {
+  /* Same band as the board's section heads. */
   display: flex;
+  min-height: 2.25rem;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0 0.4rem 0.25rem;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--foreground) 3.5%, var(--background));
+  padding-inline: 1rem 0.375rem;
 }
 
 .workspace-file-group__title {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 11px;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--muted-foreground);
 }
 
 .workspace-file-group__title > svg {
-  width: 0.75rem;
-  height: 0.75rem;
+  display: none;
 }
 
 .workspace-file-group--conflict .workspace-file-group__title {
   color: var(--destructive);
-}
-
-.workspace-count {
-  display: inline-flex;
-  min-width: 1.05rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--foreground) 9%, transparent);
-  padding: 0 0.28rem;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.5;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted-foreground);
 }
 
 .workspace-file-group__actions {
@@ -1829,15 +2224,14 @@
   align-items: center;
   gap: 0.4rem;
   border: 0;
-  border-radius: calc(var(--radius-lg) * 0.55);
   background: transparent;
-  padding: 0.28rem 0.35rem 0.28rem 0.55rem;
+  padding: 0.35rem 0.375rem 0.35rem 1rem;
   text-align: left;
   transition: background-color var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .workspace-file:hover {
-  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 
 .workspace-file__main {
@@ -1859,18 +2253,7 @@
 }
 
 .workspace-file[data-active="true"] {
-  background: color-mix(in srgb, var(--primary) 13%, transparent);
-}
-
-.workspace-file[data-active="true"]::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.2rem;
-  bottom: 0.2rem;
-  width: 2.5px;
-  border-radius: 999px;
-  background: var(--primary);
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
 .workspace-file__status {
@@ -1942,6 +2325,15 @@
   opacity: 1;
 }
 
+/* Counts read as plain mono figures everywhere, like the board's tallies. */
+.workspace-count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+
 /* Scroll container + stacked cards (branches / history) */
 .workspace-scroll {
   min-height: 0;
@@ -1952,28 +2344,23 @@
 .workspace-stack {
   display: flex;
   width: 100%;
-  max-width: 52rem;
-  margin-inline: auto;
   flex-direction: column;
-  gap: 1.05rem;
-  padding: 1rem 1.25rem 2rem;
+  padding-bottom: 2rem;
 }
 
 .workspace-card {
-  overflow: hidden;
-  border-radius: calc(var(--radius-lg) * 0.95);
-  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
-  background: var(--card);
-  box-shadow: var(--shadow-card);
+  /* Not a card any more: a band plus ruled rows, edge to edge. */
+  background: var(--background);
 }
 
 .workspace-card__head {
   display: flex;
+  min-height: 2.5rem;
   align-items: center;
-  gap: 0.45rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  background: color-mix(in srgb, var(--muted) 40%, var(--card));
-  padding: 0.45rem 0.7rem;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--foreground) 3.5%, var(--background));
+  padding: 0.25rem 0.75rem 0.25rem 1rem;
 }
 
 .workspace-card__title {
@@ -1986,9 +2373,7 @@
 }
 
 .workspace-card__title > svg {
-  width: 0.85rem;
-  height: 0.85rem;
-  color: var(--muted-foreground);
+  display: none;
 }
 
 .workspace-card__body {
@@ -1997,29 +2382,26 @@
 }
 
 .workspace-card__foot {
-  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
-  background: color-mix(in srgb, var(--muted) 30%, var(--card));
-  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  padding: 0.6rem 1rem;
 }
 
 .workspace-row {
   display: flex;
+  min-height: 2.5rem;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  padding: 0.3rem 0.75rem 0.3rem 1rem;
   transition: background-color var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.workspace-row + .workspace-row {
-  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-}
-
 .workspace-row:hover {
-  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 
 .workspace-row[data-current="true"] {
-  background: color-mix(in srgb, var(--primary) 9%, transparent);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 
 .workspace-row__name {
@@ -2061,11 +2443,12 @@
 }
 
 /* Commit composer */
+
 .workspace-commit {
   flex-shrink: 0;
-  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--muted) 42%, var(--card));
-  padding: 0.55rem 1.25rem 0.7rem;
+  border-top: 1px solid var(--border);
+  background: var(--background);
+  padding: 0.55rem 1rem 0.7rem;
 }
 
 .workspace-commit__head {
@@ -2156,28 +2539,24 @@
 }
 
 /* Diff */
+
 .workspace-diff {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
-  padding: 0.7rem;
 }
 
 .workspace-hunk {
-  overflow: hidden;
-  border-radius: calc(var(--radius-lg) * 0.8);
-  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
-  background: var(--card);
-  box-shadow: var(--shadow-control);
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
 }
 
 .workspace-hunk__head {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--muted) 45%, var(--card));
-  padding: 0.28rem 0.45rem 0.28rem 0.6rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  background: color-mix(in srgb, var(--foreground) 3.5%, var(--background));
+  padding: 0.25rem 0.5rem 0.25rem 1rem;
 }
 
 .workspace-hunk__header {
@@ -2217,7 +2596,7 @@
   display: flex;
   min-width: 0;
   align-items: stretch;
-  padding-left: 0.4rem;
+  padding-left: 0.5rem;
 }
 
 .workspace-diff-line--add {
@@ -2235,7 +2614,7 @@
   text-align: right;
   font-size: 10.5px;
   line-height: 1.35rem;
-  color: color-mix(in srgb, var(--foreground) 32%, transparent);
+  color: color-mix(in srgb, var(--foreground) 64%, transparent);
   user-select: none;
   font-variant-numeric: tabular-nums;
 }
@@ -2263,11 +2642,12 @@
 }
 
 /* Commit detail rail (history tab) */
+
 .workspace-detail {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
-  padding: 0.75rem;
+  padding: 0.75rem 1rem;
 }
 
 .workspace-detail__subject {
@@ -2310,10 +2690,8 @@
 }
 
 .workspace-action-group__label {
-  font-size: 10.5px;
+  font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
   color: var(--muted-foreground);
 }
 
@@ -2341,6 +2719,12 @@
   text-align: center;
 }
 
+/* Fills the whole tab body when both panes would otherwise be empty. */
+
+.workspace-empty--surface {
+  border-top: 0;
+}
+
 .workspace-empty--compact {
   flex: 0 0 auto;
   padding: 1.1rem;
@@ -2348,21 +2732,13 @@
 
 .workspace-empty__icon {
   display: inline-flex;
-  width: 2.25rem;
-  height: 2.25rem;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 0.35rem;
-  border-radius: 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
-  background: color-mix(in srgb, var(--muted) 55%, var(--card));
+  margin-bottom: 0.25rem;
   color: var(--muted-foreground);
-  box-shadow: var(--shadow-control);
 }
 
 .workspace-empty__icon > svg {
-  width: 1.05rem;
-  height: 1.05rem;
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .workspace-empty__title {
@@ -2373,7 +2749,7 @@
 
 .workspace-empty__desc {
   max-width: 22rem;
-  font-size: 11.5px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--muted-foreground);
 }
@@ -2408,10 +2784,6 @@
 
   .workspace-split--aside-end {
     grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
-  }
-
-  .workspace-stack {
-    padding-inline: 0.85rem;
   }
 }
 

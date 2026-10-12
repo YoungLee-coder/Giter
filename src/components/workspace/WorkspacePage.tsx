@@ -27,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { motion, useReducedMotion } from "framer-motion";
 import { useI18n } from "@/hooks/useI18n";
 import { DRAG_REGION_ATTR } from "@/lib/platform";
 import { queryKeys } from "@/lib/query/keys";
@@ -325,6 +325,7 @@ export function WorkspacePage({ repo, onBack }: Props) {
     history: null,
   };
 
+  const reduceMotion = useReducedMotion();
   const tabLabels: Record<Tab, string> = {
     changes: t("workspaceChanges"),
     branches: t("workspaceBranches"),
@@ -540,28 +541,59 @@ export function WorkspacePage({ repo, onBack }: Props) {
         </div>
       ) : null}
 
+      {status.upstream && status.behind > 0 ? (
+        <div className="workspace-banner workspace-banner--behind">
+          <span className="workspace-banner__icon">
+            <ArrowDownIcon className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1 truncate">
+            {t(status.dirty ? "workspaceBehindBannerDirty" : "workspaceBehindBanner", {
+              count: status.behind,
+              upstream: status.upstream,
+            })}
+          </span>
+          <Button
+            type="button"
+            size="xs"
+            variant="signal"
+            disabled={busy}
+            onClick={() => void run(() => api.pullRepo(path), t("workspacePulled"))}
+          >
+            <ArrowDownToLineIcon />
+            {t("workspacePull")}
+          </Button>
+        </div>
+      ) : null}
+
       <div className="workspace-tabs">
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          spacing={0}
-          value={tab}
-          onValueChange={(value) => {
-            if (value) setTab(value as Tab);
-          }}
-          aria-label={t("workspaceTabs")}
-          className="mac-segment"
-        >
+        <div className="fleet-filters" role="tablist" aria-label={t("workspaceTabs")}>
           {TABS.map((id) => (
-            <ToggleGroupItem key={id} value={id} className="mac-segment-item">
-              {tabLabels[id]}
-              {tabCounts[id] != null ? (
-                <span className="workspace-tab-count">{tabCounts[id]}</span>
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              className="fleet-filter"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+            >
+              {tab === id ? (
+                <motion.span
+                  layoutId="workspace-tab-pill"
+                  className="fleet-filter__pill"
+                  transition={
+                    reduceMotion
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: 380, damping: 32 }
+                  }
+                />
               ) : null}
-            </ToggleGroupItem>
+              <span className="fleet-filter__label">{tabLabels[id]}</span>
+              {tabCounts[id] != null ? (
+                <span className="fleet-filter__count">{tabCounts[id]}</span>
+              ) : null}
+            </button>
           ))}
-        </ToggleGroup>
+        </div>
         <div className="workspace-tabs__meta">
           {busy || snapshotQuery.isLoading ? (
             <>

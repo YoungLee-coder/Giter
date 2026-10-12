@@ -1,136 +1,81 @@
-import { ChevronDownIcon } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowDownToLineIcon, RefreshCwIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CheckboxMark } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useI18n } from "@/hooks/useI18n";
 
 type Props = {
   busy: boolean;
-  refreshing: boolean;
   selectedCount: number;
   totalCount: number;
-  allSelected: boolean;
-  someSelected: boolean;
-  onSelectAll: () => void;
   onClearSelection: () => void;
-  onAdd: () => void;
-  onClone: () => void;
-  onInit: () => void;
-  onScan: () => void;
-  onRefresh: () => void;
   onFetch: () => void;
   onUpdate: () => void;
   onRemoveSelected: () => void;
 };
 
+/**
+ * Fleet lane actions for the current selection. Only on screen while something
+ * is selected, so the idle list carries no disabled buttons.
+ */
 export function BatchBar({
   busy,
-  refreshing,
   selectedCount,
   totalCount,
-  allSelected,
-  someSelected,
-  onSelectAll,
   onClearSelection,
-  onAdd,
-  onClone,
-  onInit,
-  onScan,
-  onRefresh,
   onFetch,
   onUpdate,
   onRemoveSelected,
 }: Props) {
   const { t } = useI18n();
+  const reduceMotion = useReducedMotion();
 
   return (
-    <div className="flex shrink-0 items-center gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        disabled={busy || totalCount === 0}
-        aria-pressed={allSelected}
-        aria-label={t("selectAll")}
-        onClick={() => {
-          if (allSelected) onClearSelection();
-          else onSelectAll();
-        }}
-      >
-        <CheckboxMark
-          checked={allSelected ? true : someSelected ? "indeterminate" : false}
-        />
-        {t("selectAll")}
-      </Button>
-
-      <div className="flex shrink-0 items-center gap-1.5">
-        <div className="flex items-center">
+    <AnimatePresence>
+      {selectedCount > 0 && (
+        <motion.div
+          className="batch-bar"
+          role="toolbar"
+          aria-label={t("batchActions")}
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduceMotion ? undefined : { opacity: 0, y: 8 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <span className="batch-bar__count">
+            {t("selectedCount", { selected: selectedCount, total: totalCount })}
+          </span>
+          <span className="batch-bar__rule" aria-hidden="true" />
+          <Button type="button" variant="outline" onClick={onFetch} disabled={busy}>
+            <RefreshCwIcon />
+            {t("fetch")}
+          </Button>
+          <Button type="button" variant="signal" onClick={onUpdate} disabled={busy}>
+            <ArrowDownToLineIcon />
+            {t("fastForward")}
+          </Button>
+          <span className="batch-bar__rule" aria-hidden="true" />
           <Button
             type="button"
-            className="rounded-r-none"
-            onClick={onAdd}
+            variant="ghost"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={onRemoveSelected}
             disabled={busy}
           >
-            {t("add")}
+            {t("remove")}
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                className="rounded-l-none border-l border-primary-foreground/25 px-1.5"
-                aria-label={t("addMenu")}
-                disabled={busy}
-              >
-                <ChevronDownIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
-              <DropdownMenuGroup>
-                <DropdownMenuItem onClick={onAdd}>{t("addRepo")}</DropdownMenuItem>
-                <DropdownMenuItem onClick={onClone}>{t("clone")}</DropdownMenuItem>
-                <DropdownMenuItem onClick={onInit}>{t("initRepo")}</DropdownMenuItem>
-                <DropdownMenuItem onClick={onScan}>{t("scanFolder")}</DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onRefresh}
-          disabled={busy || refreshing}
-          aria-busy={refreshing}
-        >
-          {refreshing ? t("refreshing") : t("refresh")}
-        </Button>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-1.5">
-        <Button
-          type="button"
-          variant="destructive"
-          onClick={onRemoveSelected}
-          disabled={busy || selectedCount === 0}
-        >
-          {t("remove")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onFetch}
-          disabled={busy || selectedCount === 0}
-        >
-          {t("fetch")}
-        </Button>
-        <Button type="button" onClick={onUpdate} disabled={busy || selectedCount === 0}>
-          {t("update")}
-        </Button>
-      </div>
-    </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={t("clearSelection")}
+            title={t("clearSelection")}
+            onClick={onClearSelection}
+            disabled={busy}
+          >
+            <XIcon />
+          </Button>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
