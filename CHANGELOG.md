@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-12
+
+### Added
+
+- Fleet home groups repositories into Failed, Behind upstream and Everything else, so the ones that need attention come first
+- Section actions that need no selection: fast-forward every clean repository that is behind, or retry fetch on the ones that failed
+- "Fetch all" in the header
+- Banner with a Pull action in the repository workspace when the branch is behind its upstream
+
+### Changed
+
+- Repository cards are replaced by a ruled list; the sync column shows behind and ahead as bars on either side of the upstream
+- Workspace (changes, branches, history) and Settings use the same edge-to-edge list layout instead of cards
+- New palette: white canvas with near-black text in light mode and a matching neutral dark mode; amber marks "behind" and the action that clears it
+- The batch bar's "Update" is now labelled "Fast-forward"
+- Refreshing shows a sweep along the top of the list instead of a per-row label
+- Drag reordering works within a section
+- A clean working tree shows one empty state instead of two
+
 ## [0.5.15] - 2026-10-11
 
 ### Changed
