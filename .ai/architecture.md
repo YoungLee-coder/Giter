@@ -3,9 +3,10 @@
 ## Repository Map
 
 - `src/main.tsx` — 前端入口：QueryClient + AppUiProvider + App。
-- `src/App.tsx` — 主界面：仓库网格、批量栏、工作区整页、设置页切换、更新提示。
-- `src/components/` — UI。`repo/` 为仓库卡片/网格/批量栏；`workspace/` 为单仓库工作区；`ui/` 为 shadcn（radix-nova）；`SettingsPage.tsx` 为设置整页。
+- `src/App.tsx` — 主界面：仓库台账列表、批量栏、工作区整页、设置页切换、更新提示。
+- `src/components/` — UI。`repo/` 为仓库台账列表（状态筛选 + 按「出错 / 落后 / 其余」分段的行，段头自带批量动作，分段规则在 `fleet.ts`）与选中后出现的批量栏；`workspace/` 为单仓库工作区；`ui/` 为 shadcn（radix-nova）；`SettingsPage.tsx` 为设置整页。
 - `src/hooks/` — `useRepos` / `useSettings` / `useI18n` / `useRepoDragSort` / `useWorkspace`；`AppUiProvider` 管选中态、设置开关、工作区仓库、批量进度。
+- `src/dev/browserMock.ts` — 仅 DEV 且无 Tauri 运行时才加载的 IPC mock，让 `pnpm dev` 能在普通浏览器里预览界面（Vite 端口 1420）。
 - `src/lib/tauri.ts` — 唯一 IPC 封装：`api.*` 对应 Tauri commands，类型与 Rust `camelCase` serde 对齐。
 - `src/lib/query/` — TanStack Query 的 `queryClient` 与 `queryKeys`。
 - `src/lib/updater.ts` — 应用内更新（检查 / 下载安装 / 忽略版本）。

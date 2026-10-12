@@ -91,99 +91,100 @@ export function ChangesPanel({
 
   const pathParts = selectedFile ? splitPath(selectedFile.path) : null;
 
+  // Nothing to stage and nothing to diff: one message, not two empty panes.
+  if (files.length === 0) {
+    return (
+      <div className="workspace-empty workspace-empty--surface">
+        <span className="workspace-empty__icon">
+          <InboxIcon />
+        </span>
+        <p className="workspace-empty__title">{t("workspaceCleanTitle")}</p>
+        <p className="workspace-empty__desc">{t("workspaceCleanHint")}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="workspace-split">
       <div className="workspace-split__aside">
         <div className="giter-scroll min-h-0 flex-1 overflow-y-auto">
-          {files.length === 0 ? (
-            <div className="workspace-empty">
-              <span className="workspace-empty__icon">
-                <InboxIcon />
-              </span>
-              <p className="workspace-empty__title">{t("workspaceCleanTitle")}</p>
-              <p className="workspace-empty__desc">{t("workspaceCleanHint")}</p>
-            </div>
-          ) : (
-            <div className="workspace-file-groups">
-              {conflicts.length > 0 ? (
-                <FileGroup
-                  title={t("workspaceConflicts")}
-                  count={conflicts.length}
-                  variant="conflict"
-                  icon={<TriangleAlertIcon />}
-                  files={conflicts}
-                  selected={selected}
-                  onSelect={(file) => onSelect({ path: file.path, staged: false })}
-                />
-              ) : null}
+          <div className="workspace-file-groups">
+            {conflicts.length > 0 ? (
               <FileGroup
-                title={t("workspaceStaged")}
-                count={stagedCount}
-                icon={<FileTextIcon />}
-                files={staged}
-                selected={selected}
-                preferStaged
-                onSelect={(file) => onSelect({ path: file.path, staged: true })}
-                onQuick={(file) => onUnstage([file.path])}
-                quickIcon={<MinusIcon />}
-                quickLabel={t("workspaceUnstage")}
-                actions={
-                  staged.length > 0 ? (
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() => onUnstage(staged.map((file) => file.path))}
-                    >
-                      {t("workspaceUnstageAll")}
-                    </Button>
-                  ) : null
-                }
-              />
-              <FileGroup
-                title={t("workspaceUnstaged")}
-                count={unstagedCount}
-                icon={<FileTextIcon />}
-                files={unstaged}
+                title={t("workspaceConflicts")}
+                count={conflicts.length}
+                variant="conflict"
+                icon={<TriangleAlertIcon />}
+                files={conflicts}
                 selected={selected}
                 onSelect={(file) => onSelect({ path: file.path, staged: false })}
-                onQuick={(file) => onStage([file.path])}
-                quickIcon={<PlusIcon />}
-                quickLabel={t("workspaceStage")}
-                actions={
-                  unstaged.length > 0 ? (
-                    <>
-                      {discardable.length > 0 ? (
-                        <Button
-                          type="button"
-                          size="xs"
-                          variant="ghost"
-                          disabled={busy}
-                          title={t("workspaceDiscardAll")}
-                          onClick={() =>
-                            onDiscardAll(discardable.map((file) => file.path))
-                          }
-                        >
-                          <Undo2Icon />
-                          {t("workspaceDiscard")}
-                        </Button>
-                      ) : null}
+              />
+            ) : null}
+            <FileGroup
+              title={t("workspaceStaged")}
+              count={stagedCount}
+              icon={<FileTextIcon />}
+              files={staged}
+              selected={selected}
+              preferStaged
+              onSelect={(file) => onSelect({ path: file.path, staged: true })}
+              onQuick={(file) => onUnstage([file.path])}
+              quickIcon={<MinusIcon />}
+              quickLabel={t("workspaceUnstage")}
+              actions={
+                staged.length > 0 ? (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => onUnstage(staged.map((file) => file.path))}
+                  >
+                    {t("workspaceUnstageAll")}
+                  </Button>
+                ) : null
+              }
+            />
+            <FileGroup
+              title={t("workspaceUnstaged")}
+              count={unstagedCount}
+              icon={<FileTextIcon />}
+              files={unstaged}
+              selected={selected}
+              onSelect={(file) => onSelect({ path: file.path, staged: false })}
+              onQuick={(file) => onStage([file.path])}
+              quickIcon={<PlusIcon />}
+              quickLabel={t("workspaceStage")}
+              actions={
+                unstaged.length > 0 ? (
+                  <>
+                    {discardable.length > 0 ? (
                       <Button
                         type="button"
                         size="xs"
                         variant="ghost"
                         disabled={busy}
-                        onClick={() => onStage(unstaged.map((file) => file.path))}
+                        title={t("workspaceDiscardAll")}
+                        onClick={() => onDiscardAll(discardable.map((file) => file.path))}
                       >
-                        {t("workspaceStageAll")}
+                        <Undo2Icon />
+                        {t("workspaceDiscard")}
                       </Button>
-                    </>
-                  ) : null
-                }
-              />
-            </div>
-          )}
+                    ) : null}
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => onStage(unstaged.map((file) => file.path))}
+                    >
+                      {t("workspaceStageAll")}
+                    </Button>
+                  </>
+                ) : null
+              }
+            />
+          </div>
         </div>
       </div>
 
