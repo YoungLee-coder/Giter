@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { SquircleSurface } from "@/components/ui/squircle-surface";
 import { fadePage } from "@/lib/motion";
 import { XIcon } from "lucide-react";
 
@@ -112,7 +113,7 @@ function DialogContent({
             data-slot="dialog-content"
             forceMount
             className={cn(
-              "giter-dialog fixed top-1/2 left-1/2 z-[80] grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-[var(--radius-lg)] p-4 text-sm outline-none sm:max-w-sm sm:rounded-lg",
+              "giter-dialog squircle-host fixed top-1/2 left-1/2 z-[80] grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-[var(--radius-lg)] p-4 text-sm outline-none sm:max-w-sm sm:rounded-lg",
               className,
             )}
             style={{ x: "-50%", y: "-50%" }}
@@ -122,6 +123,7 @@ function DialogContent({
             transition={transition}
             {...(props as Record<string, unknown>)}
           >
+            <SquircleSurface />
             {children}
             {showCloseButton ? (
               <DialogPrimitive.Close data-slot="dialog-close" asChild>
