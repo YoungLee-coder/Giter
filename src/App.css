@@ -1057,15 +1057,53 @@
   -webkit-app-region: no-drag;
 }
 
+/* Squircle (continuous-curvature) corners.
+   `.squircle-host` + <SquircleSurface /> clip a background layer with Lisse; the
+   host itself paints no background or border. Lisse appends its border overlay
+   (a direct-child <svg> with inline pointer-events) to the host, stroked in
+   currentColor and coloured here. */
+.squircle-host {
+  isolation: isolate;
+  border: 0;
+  background: transparent;
+}
+
+.squircle-host > svg[style*="pointer-events"] {
+  color: var(--squircle-border, var(--border));
+  transition: color var(--motion-duration-panel) var(--motion-ease-out);
+}
+
+/* Native fallback for the remaining large surfaces. Chromium (WebView2) only for
+   now; WKWebView ignores it and keeps plain border-radius. */
+@supports (corner-shape: squircle) {
+  .squircle-host,
+  [data-slot="card"],
+  [data-slot="alert"],
+  [data-slot="button"],
+  [data-slot="input"],
+  [data-slot="toggle"],
+  [data-slot="popover-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  .settings-pane-icon,
+  .settings-status-card,
+  .settings-about-hero,
+  .settings-about-logo,
+  .settings-mobile-nav,
+  .settings-row,
+  .soft-panel {
+    corner-shape: squircle;
+  }
+}
+
 /* Repo cards — hover/selected: primary border + light shadow (cc-switch hover). */
 .repo-card {
   --card-spacing: 0.875rem;
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  background: var(--card);
   box-shadow: var(--shadow-card);
-  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+  --squircle-border: color-mix(in srgb, var(--border) 80%, transparent);
   transition:
     box-shadow var(--motion-duration-panel) var(--motion-ease-out),
     opacity var(--motion-duration-color) var(--motion-ease-out),
@@ -1074,7 +1112,7 @@
 
 .repo-card:not(.is-dragging):hover,
 .repo-card.is-selected {
-  border-color: var(--primary);
+  --squircle-border: var(--primary);
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
@@ -1082,7 +1120,7 @@
    back in on drop and reads as a flash. */
 .repo-card.is-dragging {
   cursor: grabbing;
-  border-color: var(--primary);
+  --squircle-border: var(--primary);
   /* Disable opacity/border transitions while dragging so drop does not fade. */
   transition: none;
 }
@@ -1104,6 +1142,11 @@
 
 .repo-grid.is-reordering .repo-card {
   /* Avoid CSS opacity/color transitions fighting sibling FLIP frames. */
+  transition: none;
+}
+
+.repo-card.is-dragging > svg[style*="pointer-events"],
+.repo-grid.is-reordering .repo-card > svg[style*="pointer-events"] {
   transition: none;
 }
 
@@ -1311,8 +1354,7 @@
 }
 
 [data-slot="dialog-content"].giter-dialog {
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: var(--card);
+  --squircle-border: color-mix(in srgb, var(--border) 80%, transparent);
   color: var(--card-foreground);
   box-shadow: var(--shadow-dialog);
 }
@@ -1334,6 +1376,7 @@
   .repo-card,
   .repo-card.is-dragging,
   .repo-grid.is-reordering .repo-card,
+  .squircle-host > svg[style*="pointer-events"],
   .repo-card-icon {
     transition: none !important;
   }

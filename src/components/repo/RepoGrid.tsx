@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { RepoCardBody } from "@/components/repo/RepoCard";
 import { Card } from "@/components/ui/card";
+import { SquircleSurface } from "@/components/ui/squircle-surface";
 import {
   Empty,
   EmptyDescription,
@@ -241,7 +242,7 @@ function RepoSortableCard({
       <Card
         size="sm"
         className={cn(
-          "repo-card h-full cursor-pointer gap-0 border bg-card py-0",
+          "repo-card squircle-host h-full cursor-pointer gap-0 py-0",
           selected && !isDragging && "is-selected",
           // In-place drag (cc-switch): keep the card visible — no opacity ghost /
           // DragOverlay handoff that flashes on drop.
@@ -256,6 +257,7 @@ function RepoSortableCard({
           onOpenDetail(repo);
         }}
       >
+        <SquircleSurface />
         <div className="relative">
           {dragHandleProps && (
             <button
