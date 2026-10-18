@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), and this project
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-18
+
+### Changed
+
+- Weekly dependency updates (pnpm and Cargo lockfile): `@hookform/resolvers`, `@lisse/react`, `@tanstack/react-query`, `@tanstack/react-virtual`, `i18next`, `radix-ui`, `react`, `react-dom`, `@testing-library/user-event`, `shadcn`, `vitest`, and assorted Rust crates in `Cargo.lock` (excluding Tauri stack bumps)
+
+### Fixed
+
+- Keep npm `@tauri-apps/*` packages and `Cargo.lock` Tauri crates aligned with `tauri build` version checks
+- Keep `react-i18next@17.0.13`, `zod@4.5.4`, `react-hook-form@7.86.0`, `lucide-react@1.48.0`, `@tauri-apps/cli@2.11.4`, `@tauri-apps/plugin-updater@2.11.0`, and `jsdom@30.0.1` so pnpm 11 CI supply-chain policy passes
+
 ## [0.6.0] - 2026-10-12
 
 ### Added

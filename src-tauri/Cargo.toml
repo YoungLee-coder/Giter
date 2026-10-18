@@ -1,6 +1,6 @@
 [package]
 name = "giter"
-version = "0.6.0"
+version = "0.6.1"
 description = "Giter — local git repository manager with batch fetch and FF-only update"
 readme = "../README.md"
 authors = ["you"]
